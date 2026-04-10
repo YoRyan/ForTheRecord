@@ -114,27 +114,27 @@ func readConfig(path string) (cfg config) {
 		log.Fatalln(err)
 	}
 
-	if cfg.http.address == "" && cfg.smtp.address == "" {
+	if cfg.Http.Address == "" && cfg.Smtp.Address == "" {
 		log.Fatalln("No HTTP or SMTP listener is configured. There is nothing to do.")
-	} else if cfg.htpasswd.File == nil {
+	} else if cfg.Htpasswd.File == nil {
 		log.Println("WARNING: htpasswd block is not configured. Authentication will be disabled.")
 	}
 	return
 }
 
 type config struct {
-	htpasswd users
-	scopes   struct {
-		gmail struct {
-			insert []string
-			send   []string
+	Htpasswd users
+	Scopes   struct {
+		Gmail struct {
+			Insert []string
+			Send   []string
 		}
 	}
-	http struct {
-		address string
+	Http struct {
+		Address string
 	}
-	smtp struct {
-		address string
+	Smtp struct {
+		Address string
 	}
 }
 
