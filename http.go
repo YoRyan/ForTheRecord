@@ -119,7 +119,7 @@ func appriseToGmail(a apprise, user string, filters []appriseFilter) (msg gmailM
 	var sb strings.Builder
 	if len(a.Attachments) > 0 {
 		// Multipart body with attachments.
-		headers["Content-type"] = fmt.Sprintf("multipart/mixed; boundary=\"%s\"", appriseMultipartBoundary)
+		headers["Content-Type"] = fmt.Sprintf("multipart/mixed; boundary=\"%s\"", appriseMultipartBoundary)
 		for k, v := range headers {
 			fmt.Fprintf(&sb, "%s: %s\n", k, v)
 		}
@@ -127,14 +127,14 @@ func appriseToGmail(a apprise, user string, filters []appriseFilter) (msg gmailM
 		// Write the notification message as the primary body.
 		sb.WriteString("\n")
 		fmt.Fprintf(&sb, "--%s\n", appriseMultipartBoundary)
-		fmt.Fprintf(&sb, "Content-type: %s\n\n", bodyType)
+		fmt.Fprintf(&sb, "Content-Type: %s\n\n", bodyType)
 		sb.WriteString(body)
 		sb.WriteString("\n")
 
 		// Write the attachments.
 		for _, at := range a.Attachments {
 			fmt.Fprintf(&sb, "--%s\n", appriseMultipartBoundary)
-			fmt.Fprintf(&sb, "Content-type: %s; name=\"%s\"\n", at.Mimetype, url.QueryEscape(at.Filename))
+			fmt.Fprintf(&sb, "Content-Type: %s; name=\"%s\"\n", at.Mimetype, url.QueryEscape(at.Filename))
 			sb.WriteString("Content-Transfer-Encoding: base64\n\n")
 			sb.WriteString(at.Base64)
 			sb.WriteString("\n")
@@ -143,7 +143,7 @@ func appriseToGmail(a apprise, user string, filters []appriseFilter) (msg gmailM
 	} else {
 		// Single-part body.
 		if bodyType != "" {
-			headers["Content-type"] = bodyType
+			headers["Content-Type"] = bodyType
 		}
 		for k, v := range headers {
 			fmt.Fprintf(&sb, "%s: %s\n", k, v)
