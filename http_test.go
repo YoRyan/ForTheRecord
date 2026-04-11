@@ -161,6 +161,37 @@ func TestAppriseFilterSetsBody(t *testing.T) {
 	}
 }
 
+func TestAppriseFilterSetsBodyType(t *testing.T) {
+	gm, _ := appriseToGmail(apprise{
+		Version: "1.0",
+		Title:   "Hello, World!",
+		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+		Format:  "text",
+		Type:    "info",
+	}, "", []appriseFilter{
+		{
+			Match: struct {
+				User   string
+				Type   string
+				Format string
+			}{Type: "info"},
+			Output: filterOutput{
+				Body:     "<p>This is my message: <strong>{{.Title}}</strong></p>",
+				BodyType: "text/html",
+			},
+		},
+	})
+	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
+	body, _ := io.ReadAll(msg.Body)
+
+	if got, want := strings.TrimSpace(string(body)), "<p>This is my message: <strong>Hello, World!</strong></p>"; got != want {
+		t.Errorf("gm.Envelope.Body = %s; want %s", got, want)
+	}
+	if got, want := msg.Header.Get("Content-Type"), "text/html"; got != want {
+		t.Errorf("gm.Envelope.Header.Content-Type = %s; want %s", got, want)
+	}
+}
+
 func TestAppriseFilterSetsHeader(t *testing.T) {
 	gm, _ := appriseToGmail(apprise{
 		Version: "1.0",
@@ -270,5 +301,25 @@ func TestAppriseFilterInheritsPrevious(t *testing.T) {
 	}
 	if got, want := msg.Header.Get("Subject"), "[Awesome] Hello, World!"; got != want {
 		t.Errorf("msg.Header.Subject = %s; want %s", got, want)
+	}
+}
+
+func TestAppriseConvertsMarkdown(t *testing.T) {
+	gm, _ := appriseToGmail(apprise{
+		Version: "1.0",
+		Title:   "Hello, World!",
+		Message: "# Hello, World!\n\n**Lorem ipsum** dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+		Format:  "markdown",
+		Type:    "info",
+	}, "", []appriseFilter{})
+	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
+	body, _ := io.ReadAll(msg.Body)
+
+	// Comparing HTML like this can be fragile. Hopefully it won't break in the far future...
+	if got, want := strings.TrimSpace(string(body)), "<h1>Hello, World!</h1>\n\n<p><strong>Lorem ipsum</strong> dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>"; got != want {
+		t.Errorf("gm.Envelope.Body = %s; want %s", got, want)
+	}
+	if got, want := msg.Header.Get("Content-Type"), "text/html"; got != want {
+		t.Errorf("gm.Envelope.Header.Content-Type = %s; want %s", got, want)
 	}
 }

@@ -151,6 +151,7 @@ type filterOutput struct {
 	LabelIds []string
 	Headers  map[string]string
 	Body     string
+	BodyType string
 }
 
 type gmailMessage struct {

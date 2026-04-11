@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/gomarkdown/markdown"
 	"google.golang.org/api/gmail/v1"
 )
 
@@ -35,13 +36,31 @@ func appriseToGmail(a apprise, user string, filters []appriseFilter) (msg gmailM
 	}
 
 	var (
+		defaultBody string
+		defaultMime string
+	)
+	switch a.Format {
+	case "html":
+		defaultMime = "text/html"
+		defaultBody = a.Message
+	case "markdown":
+		defaultMime = "text/html"
+		defaultBody = string(markdown.ToHTML([]byte(a.Message), nil, nil))
+	case "text":
+	default:
+		defaultMime = "text/plain"
+		defaultBody = a.Message
+	}
+
+	var (
 		labelIds = []string{"INBOX"}
 		headers  = map[string]string{
 			"From":    defaultFrom,
 			"To":      "me",
 			"Subject": fmt.Sprintf("[%s] %s", a.Type, a.Title),
 		}
-		body string = a.Message
+		body     = defaultBody
+		bodyType = defaultMime
 	)
 
 	for _, f := range filters {
@@ -88,6 +107,13 @@ func appriseToGmail(a apprise, user string, filters []appriseFilter) (msg gmailM
 
 			body = b.String()
 		}
+		if o.BodyType != "" {
+			bodyType = o.BodyType
+		}
+	}
+
+	if bodyType != "" {
+		headers["Content-Type"] = bodyType
 	}
 
 	var sb strings.Builder

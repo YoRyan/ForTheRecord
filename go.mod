@@ -3,6 +3,7 @@ module github.com/YoRyan/gmaas
 go 1.25.8
 
 require (
+	github.com/gomarkdown/markdown v0.0.0-20260411013819-759bbc3e3207
 	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/tg123/go-htpasswd v1.2.4
 	golang.org/x/oauth2 v0.36.0
