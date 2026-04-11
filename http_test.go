@@ -8,10 +8,15 @@ import (
 	"testing"
 )
 
-func TestAppriseFailsWhenEmpty(t *testing.T) {
-	_, err := (apprise{}).toGmailMessage("", []appriseFilter{})
-	if err == nil {
-		t.Error("toGmailMessage() = nil")
+func TestAppriseEmptyCreatesValidMessage(t *testing.T) {
+	gm, _ := (apprise{}).toGmailMessage("", []appriseFilter{})
+	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
+
+	if got := msg.Header.Get("From"); got == "" {
+		t.Errorf("msg.Header.From = %v", got)
+	}
+	if got := msg.Header.Get("To"); got == "" {
+		t.Errorf("msg.Header.To = %v", got)
 	}
 }
 
