@@ -113,7 +113,7 @@ func appriseToGmail(a apprise, user string, filters []appriseFilter) (msg gmailM
 	}
 
 	if bodyType != "" {
-		headers["Content-Type"] = bodyType
+		headers["Content-type"] = bodyType
 	}
 
 	var sb strings.Builder

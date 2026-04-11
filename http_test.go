@@ -187,8 +187,8 @@ func TestAppriseFilterSetsBodyType(t *testing.T) {
 	if got, want := strings.TrimSpace(string(body)), "<p>This is my message: <strong>Hello, World!</strong></p>"; got != want {
 		t.Errorf("gm.Envelope.Body = %s; want %s", got, want)
 	}
-	if got, want := msg.Header.Get("Content-Type"), "text/html"; got != want {
-		t.Errorf("gm.Envelope.Header.Content-Type = %s; want %s", got, want)
+	if got, want := msg.Header.Get("Content-type"), "text/html"; got != want {
+		t.Errorf("gm.Envelope.Header.Content-type = %s; want %s", got, want)
 	}
 }
 
@@ -319,7 +319,7 @@ func TestAppriseConvertsMarkdown(t *testing.T) {
 	if got, want := strings.TrimSpace(string(body)), "<h1>Hello, World!</h1>\n\n<p><strong>Lorem ipsum</strong> dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>"; got != want {
 		t.Errorf("gm.Envelope.Body = %s; want %s", got, want)
 	}
-	if got, want := msg.Header.Get("Content-Type"), "text/html"; got != want {
-		t.Errorf("gm.Envelope.Header.Content-Type = %s; want %s", got, want)
+	if got, want := msg.Header.Get("Content-type"), "text/html"; got != want {
+		t.Errorf("gm.Envelope.Header.Content-type = %s; want %s", got, want)
 	}
 }
