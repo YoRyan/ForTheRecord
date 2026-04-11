@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -51,6 +52,14 @@ func (a apprise) toGmailMessage(user string, filters []appriseFilter) (msg gmail
 		defaultFrom = user
 	}
 
+	var defaultSubject string
+	if a.Type == "" {
+		// Title-only format for Shoutrrr.
+		defaultSubject = a.Title
+	} else {
+		defaultSubject = fmt.Sprintf("[%s] %s", a.Type, a.Title)
+	}
+
 	var (
 		defaultBody string
 		defaultMime string
@@ -69,12 +78,14 @@ func (a apprise) toGmailMessage(user string, filters []appriseFilter) (msg gmail
 		defaultBody = a.Message
 	}
 
+	// Initialize variables to our default values. They may get changed by
+	// middleware.
 	var (
 		labelIds = []string{"INBOX"}
 		headers  = map[string]string{
 			"From":    defaultFrom,
 			"To":      "me",
-			"Subject": fmt.Sprintf("[%s] %s", a.Type, a.Title),
+			"Subject": defaultSubject,
 		}
 		body       = defaultBody
 		bodyType   = defaultMime
@@ -194,7 +205,7 @@ func (a apprise) toGmailMessage(user string, filters []appriseFilter) (msg gmail
 
 // Runs the HTTP web server.
 func httpListenAndServe(cfg *config, mail *gmail.Service) {
-	http.HandleFunc("/apprise/json", func(w http.ResponseWriter, r *http.Request) {
+	appriseHandler := func(w http.ResponseWriter, r *http.Request) {
 		user, pass, _ := r.BasicAuth()
 		if !cfg.hasGmailInsertScope(user, pass) {
 			http.Error(w, "Not authorized", http.StatusUnauthorized)
@@ -226,6 +237,44 @@ func httpListenAndServe(cfg *config, mail *gmail.Service) {
 			log.Println("Attempted with apprise notification:", a)
 			return
 		}
+	}
+	http.HandleFunc("/apprise/json", appriseHandler)
+	http.HandleFunc("/shoutrrr/generic/json", appriseHandler)
+
+	http.HandleFunc("/shoutrrr/generic", func(w http.ResponseWriter, r *http.Request) {
+		user, pass, _ := r.BasicAuth()
+		if !cfg.hasGmailInsertScope(user, pass) {
+			http.Error(w, "Not authorized", http.StatusUnauthorized)
+			return
+		}
+
+		if r.Method != "POST" {
+			http.Error(w, "POST request required", http.StatusBadRequest)
+			return
+		}
+
+		// If a template is not specified, shoutrrr only sends the notification
+		// message and silently drops the title, which is pretty irritating.
+		var a apprise
+		a.Title = "shoutrrr"
+		b, _ := io.ReadAll(r.Body)
+		a.Message = string(b)
+
+		msg, err := a.toGmailMessage(user, cfg.Http.Shoutrrr.Filters)
+		if err != nil {
+			http.Error(w, "Failed request", http.StatusBadRequest)
+			log.Println("Error in appriseToGmail:", err)
+			log.Println("Attempted with shoutrrr notification:", a)
+			return
+		}
+
+		if err := msg.uploadToGmail(mail); err != nil {
+			http.Error(w, "Failed request", http.StatusBadRequest)
+			log.Println("Gmail upload error:", err)
+			log.Println("Attempted with shoutrrr notification:", a)
+			return
+		}
 	})
+
 	log.Fatal(http.ListenAndServe(cfg.Http.Address, nil))
 }

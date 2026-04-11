@@ -71,6 +71,11 @@ type config struct {
 		Apprise struct {
 			Filters []appriseFilter
 		}
+		Shoutrrr struct {
+			// We can only really match against User, but reusing the same
+			// struct makes it possible to share code with Apprise.
+			Filters []appriseFilter
+		}
 		Address string
 	}
 	Smtp struct {

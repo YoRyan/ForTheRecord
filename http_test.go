@@ -473,3 +473,31 @@ func TestAppriseSendsAttachments(t *testing.T) {
 		t.Errorf("strings.Contains(s, base64(lorem.json)) = %v; want %v", got, want)
 	}
 }
+
+func TestAppriseWithShoutrrrContent(t *testing.T) {
+	gm, _ := (apprise{
+		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+	}).toGmailMessage("AzureDiamond", []appriseFilter{})
+	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
+	body, _ := io.ReadAll(msg.Body)
+
+	if got, want := string(body), "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."; got != want {
+		t.Errorf("msg.Body = %s; want %s", got, want)
+	}
+}
+
+func TestAppriseWithShoutrrrContentJson(t *testing.T) {
+	gm, _ := (apprise{
+		Title:   "Hello, World!",
+		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+	}).toGmailMessage("AzureDiamond", []appriseFilter{})
+	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
+	body, _ := io.ReadAll(msg.Body)
+
+	if got, want := msg.Header.Get("Subject"), "Hello, World!"; got != want {
+		t.Errorf("msg.Header.Subject = %s; want %s", got, want)
+	}
+	if got, want := string(body), "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."; got != want {
+		t.Errorf("msg.Body = %s; want %s", got, want)
+	}
+}
