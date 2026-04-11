@@ -125,13 +125,15 @@ func httpListenAndServe(cfg *config, mail *gmail.Service) {
 		msg, err := appriseToGmail(a, user, cfg.Http.Apprise.Filters)
 		if err != nil {
 			http.Error(w, "Failed request", http.StatusBadRequest)
+			log.Println("Error in appriseToGmail:", err)
+			log.Println("Attempted with apprise notification:", a)
 			return
 		}
 
 		if err := msg.uploadToGmail(mail); err != nil {
+			http.Error(w, "Failed request", http.StatusBadRequest)
 			log.Println("Gmail upload error:", err)
 			log.Println("Attempted with apprise notification:", a)
-			http.Error(w, "Failed request", http.StatusBadRequest)
 			return
 		}
 	})
