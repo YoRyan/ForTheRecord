@@ -27,9 +27,9 @@ type apprise struct {
 	Title   string
 	Message string
 	// Not an official field. The user would have to inject it by inserting
-	// :format=whatever into their Apprise URL. Allows sender to specify "text",
-	// "html", or "markdown".
-	Format      string
+	// :gmaasfmt=whatever into their Apprise URL. Allows sender to specify
+	// "text", "html", or "markdown".
+	GmaasFmt    string
 	Attachments []struct {
 		Filename string
 		Base64   string
@@ -64,7 +64,7 @@ func (a apprise) toGmailMessage(user string, filters []appriseFilter) (msg gmail
 		defaultBody string
 		defaultMime string
 	)
-	switch a.Format {
+	switch a.GmaasFmt {
 	case "html":
 		defaultMime = "text/html"
 		defaultBody = a.Message
@@ -103,7 +103,7 @@ func (a apprise) toGmailMessage(user string, filters []appriseFilter) (msg gmail
 		if m.Type != "" && m.Type != a.Type {
 			continue
 		}
-		if m.Format != "" && m.Format != a.Format {
+		if m.Format != "" && m.Format != a.GmaasFmt {
 			continue
 		}
 
