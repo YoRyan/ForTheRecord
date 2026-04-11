@@ -38,7 +38,7 @@ type apprise struct {
 
 // Converts Apprise payloads to Gmail messages with user-configurable
 // middleware.
-func appriseToGmail(a apprise, user string, filters []appriseFilter) (msg gmailMessage, err error) {
+func (a apprise) toGmailMessage(user string, filters []appriseFilter) (msg gmailMessage, err error) {
 	var defaultFrom string
 	if user == "" {
 		defaultFrom = "me"
@@ -207,7 +207,7 @@ func httpListenAndServe(cfg *config, mail *gmail.Service) {
 			return
 		}
 
-		msg, err := appriseToGmail(a, user, cfg.Http.Apprise.Filters)
+		msg, err := a.toGmailMessage(user, cfg.Http.Apprise.Filters)
 		if err != nil {
 			http.Error(w, "Failed request", http.StatusBadRequest)
 			log.Println("Error in appriseToGmail:", err)

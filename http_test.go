@@ -9,13 +9,13 @@ import (
 )
 
 func TestAppriseDefaultHeaders(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "AzureDiamond", []appriseFilter{})
+	}).toGmailMessage("AzureDiamond", []appriseFilter{})
 
 	if len(gm.LabelIds) != 1 || gm.LabelIds[0] != "INBOX" {
 		t.Errorf("gm.LabelIds = %v; want %s", gm.LabelIds, "{INBOX}")
@@ -37,13 +37,13 @@ func TestAppriseDefaultHeaders(t *testing.T) {
 }
 
 func TestAppriseDefaultBody(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "AzureDiamond", []appriseFilter{})
+	}).toGmailMessage("AzureDiamond", []appriseFilter{})
 	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
 	body, _ := io.ReadAll(msg.Body)
 
@@ -52,13 +52,13 @@ func TestAppriseDefaultBody(t *testing.T) {
 	}
 }
 func TestAppriseDefaultParameters(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "AzureDiamond", []appriseFilter{})
+	}).toGmailMessage("AzureDiamond", []appriseFilter{})
 
 	if got, want := gm.InternalDateSource, "receivedTime"; got != want {
 		t.Errorf("gm.InternalDateSource = %s; want %s", got, want)
@@ -75,13 +75,13 @@ func TestAppriseDefaultParameters(t *testing.T) {
 }
 
 func TestAppriseDefaultHeadersUnauthenticated(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "", []appriseFilter{})
+	}).toGmailMessage("", []appriseFilter{})
 	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
 
 	if got, want := msg.Header.Get("From"), "me"; got != want {
@@ -90,13 +90,13 @@ func TestAppriseDefaultHeadersUnauthenticated(t *testing.T) {
 }
 
 func TestAppriseFilterMatchesUser(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "AzureDiamond", []appriseFilter{
+	}).toGmailMessage("AzureDiamond", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -118,13 +118,13 @@ func TestAppriseFilterMatchesUser(t *testing.T) {
 }
 
 func TestAppriseFilterMatchesType(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "AzureDiamond", []appriseFilter{
+	}).toGmailMessage("AzureDiamond", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -146,13 +146,13 @@ func TestAppriseFilterMatchesType(t *testing.T) {
 }
 
 func TestAppriseFilterMatchesFormat(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "AzureDiamond", []appriseFilter{
+	}).toGmailMessage("AzureDiamond", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -174,13 +174,13 @@ func TestAppriseFilterMatchesFormat(t *testing.T) {
 }
 
 func TestAppriseFilterSetsBody(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "", []appriseFilter{
+	}).toGmailMessage("", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -201,13 +201,13 @@ func TestAppriseFilterSetsBody(t *testing.T) {
 }
 
 func TestAppriseFilterSetsBodyType(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "", []appriseFilter{
+	}).toGmailMessage("", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -232,13 +232,13 @@ func TestAppriseFilterSetsBodyType(t *testing.T) {
 }
 
 func TestAppriseFilterSetsHeader(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "", []appriseFilter{
+	}).toGmailMessage("", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -260,13 +260,13 @@ func TestAppriseFilterSetsHeader(t *testing.T) {
 }
 
 func TestAppriseFilterSetsDateSource(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "", []appriseFilter{
+	}).toGmailMessage("", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -292,13 +292,13 @@ func TestAppriseFilterSetsDateSource(t *testing.T) {
 }
 
 func TestAppriseFilterSetsNullableParameters(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "", []appriseFilter{
+	}).toGmailMessage("", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -325,13 +325,13 @@ func TestAppriseFilterSetsNullableParameters(t *testing.T) {
 }
 
 func TestAppriseFilterOverridesPrevious(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "AzureDiamond", []appriseFilter{
+	}).toGmailMessage("AzureDiamond", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -365,13 +365,13 @@ func TestAppriseFilterOverridesPrevious(t *testing.T) {
 }
 
 func TestAppriseFilterInheritsPrevious(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "text",
 		Type:    "info",
-	}, "AzureDiamond", []appriseFilter{
+	}).toGmailMessage("AzureDiamond", []appriseFilter{
 		{
 			Match: struct {
 				User   string
@@ -409,13 +409,13 @@ func TestAppriseFilterInheritsPrevious(t *testing.T) {
 }
 
 func TestAppriseConvertsMarkdown(t *testing.T) {
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version: "1.0",
 		Title:   "Hello, World!",
 		Message: "# Hello, World!\n\n**Lorem ipsum** dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:  "markdown",
 		Type:    "info",
-	}, "", []appriseFilter{})
+	}).toGmailMessage("", []appriseFilter{})
 	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
 	body, _ := io.ReadAll(msg.Body)
 
@@ -438,14 +438,14 @@ func TestAppriseSendsAttachments(t *testing.T) {
 		{Filename: "hello.txt", Base64: "SGVsbG8sIFdvcmxkIQ==", Mimetype: "text/plain"},
 		{Filename: "lorem.json", Base64: "eyJtZXNzYWdlIjoiTG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdCwgc2VkIGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlxdWEuIn0=", Mimetype: "application/json"},
 	}
-	gm, _ := appriseToGmail(apprise{
+	gm, _ := (apprise{
 		Version:     "1.0",
 		Title:       "Hello, World!",
 		Message:     "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
 		Format:      "text",
 		Attachments: attachments,
 		Type:        "info",
-	}, "", []appriseFilter{})
+	}).toGmailMessage("", []appriseFilter{})
 	msg, _ := mail.ReadMessage(strings.NewReader(gm.Envelope))
 	body, _ := io.ReadAll(msg.Body)
 	s := string(body)
