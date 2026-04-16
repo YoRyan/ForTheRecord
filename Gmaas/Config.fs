@@ -1,5 +1,10 @@
 module Gmaas.Config
 
+open System
+open System.IO
+open System.Threading
+open System.Threading.Tasks
+
 open Google.Apis.Auth.OAuth2
 open Google.Apis.Auth.OAuth2.Flows
 open Google.Apis.Auth.OAuth2.Responses
@@ -7,10 +12,6 @@ open Google.Apis.Gmail.v1
 open Google.Apis.Services
 open Google.Apis.Util.Store
 open Meziantou.Framework.Http
-open System
-open System.IO
-open System.Threading
-open System.Threading.Tasks
 open Tomlyn.Model
 
 [<Literal>]

@@ -1,9 +1,11 @@
-﻿open Gmaas.Config
-open Gmaas.Http
-open System.IO
+﻿open System.IO
 open System.Threading.Tasks
+
 open Tomlyn
 open Tomlyn.Model
+
+open Gmaas.Config
+open Gmaas.Http
 
 let doAuth (configFile: FileInfo) =
     task {

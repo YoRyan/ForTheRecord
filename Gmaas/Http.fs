@@ -1,17 +1,18 @@
 module Gmaas.Http
 
+open System.Security.Claims
+open System.Threading.Tasks
+
 open Giraffe
-open Google.Apis.Gmail.v1
-open Gmaas.Config
-open Gmaas.Gmail
-open Gmaas.Helpers
 open idunno.Authentication.Basic
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Primitives
-open System.Security.Claims
-open System.Threading.Tasks
+
+open Gmaas.Config
+open Gmaas.Gmail
+open Gmaas.Helpers
 
 module private Realms =
     [<Literal>]

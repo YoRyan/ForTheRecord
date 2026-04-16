@@ -1,12 +1,14 @@
 module Gmaas.Gmail
 
-open Gmaas.Helpers
-open Google.Apis.Gmail.v1
 open System
 open System.Buffers.Text
 open System.Collections.Generic
 open System.Text
 open System.Web
+
+open Google.Apis.Gmail.v1
+
+open Gmaas.Helpers
 
 type InternalDateSourceEnum = UsersResource.MessagesResource.ImportRequest.InternalDateSourceEnum
 
