@@ -6,6 +6,7 @@ open Google.Apis.Auth.OAuth2.Responses
 open Google.Apis.Gmail.v1
 open Google.Apis.Services
 open Google.Apis.Util.Store
+open Meziantou.Framework.Http
 open System
 open System.IO
 open System.Threading
@@ -47,9 +48,9 @@ type ShoutrrrMiddleware =
       Output: GmailOutput }
 
 type ServeConfig =
-    { Htpasswd: string option
-      AuthGmailInsert: string list
-      AuthGmailSend: string list
+    { Htpasswd: HtpasswdFile option
+      AuthGmailInsert: Set<string>
+      AuthGmailSend: Set<string>
       AppriseMiddleware: AppriseMiddleware list
       ShoutrrrMiddleware: ShoutrrrMiddleware list
       HttpAddress: string
@@ -155,19 +156,21 @@ let loadServeConfig (t: TomlTable) =
         initializer.ApplicationName <- applicationName
 
         return
-            { Htpasswd = t |> inTable "htpasswd"
+            { Htpasswd = t |> inTable<string> "htpasswd" |> Option.map HtpasswdFile.Parse
               AuthGmailInsert =
                 googleScopes
                 |> Option.bind (inTable "gmail")
                 |> Option.bind (inTable "insert")
                 |> Option.map asList
                 |> Option.defaultValue []
+                |> Set.ofList
               AuthGmailSend =
                 googleScopes
                 |> Option.bind (inTable "gmail")
                 |> Option.bind (inTable "send")
                 |> Option.map asList
                 |> Option.defaultValue []
+                |> Set.ofList
               AppriseMiddleware =
                 http
                 |> Option.bind (inTable "apprise")
