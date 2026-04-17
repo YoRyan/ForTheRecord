@@ -1,8 +1,10 @@
 ﻿module Tests.Helpers
 
-open Gmaas.Helpers
 open System.Collections.Generic
+
 open Xunit
+
+open Gmaas.Helpers
 
 [<Fact>]
 let ``Simple header override works`` () =
