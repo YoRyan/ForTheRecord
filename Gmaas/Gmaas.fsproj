@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Helpers.fs" />
+    
     <Compile Include="Gmail.fs" />
     <Compile Include="Config.fs" />
     <Compile Include="Http.fs" />
@@ -17,6 +17,7 @@
     <PackageReference Include="Giraffe" Version="8.2.0" />
     <PackageReference Include="Google.Apis.Gmail.v1" Version="1.73.0.4029" />
     <PackageReference Include="idunno.Authentication.Basic" Version="2.4.0" />
+    <PackageReference Include="MailKitLite" Version="4.16.0" />
     <PackageReference Include="Meziantou.Framework.Http.Htpasswd" Version="1.0.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.5" />
     <PackageReference Include="Tomlyn" Version="2.3.0" />

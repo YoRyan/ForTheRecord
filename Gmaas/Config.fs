@@ -57,7 +57,7 @@ type ServeConfig =
       AppriseMiddleware: AppriseMiddleware list
       ShoutrrrMiddleware: ShoutrrrMiddleware list
       HttpAddress: string
-      Gmail: IGmailFs }
+      Gmail: IGmailInbox }
 
 type private CowardlyCodeReceiver() =
     interface ICodeReceiver with
@@ -207,7 +207,7 @@ let loadServeConfig (t: TomlTable) =
                               ShoutrrrMiddleware.Output = output }
                     | _ -> None)
               HttpAddress = http |> Option.bind (inTable "address") |> Option.defaultValue defaultHttp
-              Gmail = GmailFs(new GmailService(initializer)) }
+              Gmail = GmailInbox(new GmailService(initializer)) }
     }
 
 let doAuthFlow (t: TomlTable) =

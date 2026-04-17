@@ -2,6 +2,7 @@ module Tests.Http
 
 open System
 open System.Collections.Generic
+open System.IO
 open System.Net
 open System.Net.Http
 open System.Net.Http.Headers
@@ -14,21 +15,48 @@ open Meziantou.Framework.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Hosting
+open MimeKit
+open MimeKit.Text
 open Xunit
 
 open Gmaas.Config
 open Gmaas.Gmail
-open Gmaas.Helpers
 open Gmaas.Http
 
-type private MockGmailFs() =
-    member val CalledMessage: Message option = None with get, set
+type private MockGmailInbox() =
+    member val CalledImport: {| Message: MimeMessage
+                                LabelIds: string list option
+                                InternalDateSource: InternalDateSourceEnum option
+                                NeverMarkSpam: bool option
+                                ProcessForCalendar: bool option
+                                Deleted: bool option |} option = None with get, set
 
-    interface IGmailFs with
-        member this.Import(msg: Message) : Task<Data.Message> =
-            this.CalledMessage <- Some msg
+    interface IGmailInbox with
+        member this.Import
+            (
+                message: ReadOnlySpan<byte>,
+                ?labelIds: string list,
+                ?internalDateSource: InternalDateSourceEnum,
+                ?neverMarkSpam: bool,
+                ?processForCalendar: bool,
+                ?deleted: bool
+            ) : Task<Data.Message> =
+            use stream = new MemoryStream(message.ToArray())
+            let message = MimeMessage.Load stream
+
+            this.CalledImport <-
+                Some
+                    {| Message = message
+                       LabelIds = labelIds
+                       InternalDateSource = internalDateSource
+                       NeverMarkSpam = neverMarkSpam
+                       ProcessForCalendar = processForCalendar
+                       Deleted = deleted |}
+
             let whatever = Data.Message()
             Task.FromResult whatever
+
+        member this.Send(message: ReadOnlySpan<byte>) : Task<Data.Message> = failwith "Not Implemented"
 
 let private getTestApp (config: ServeConfig) =
     let builder = WebApplication.CreateBuilder()
@@ -51,9 +79,8 @@ let private testRequest (config: ServeConfig) (request: HttpRequestMessage) =
 
     resp.Result
 
-
 let private mockWithoutAuth () =
-    let mock = MockGmailFs()
+    let mock = MockGmailInbox()
 
     let config =
         { Htpasswd = None
@@ -67,7 +94,7 @@ let private mockWithoutAuth () =
     config, mock
 
 let private mockWithHunter2Auth (user: string) (hasInsert: bool) (hasSend: bool) =
-    let mock = MockGmailFs()
+    let mock = MockGmailInbox()
 
     let authSet yay =
         if yay then Set(Seq.singleton user) else Set.empty
@@ -92,6 +119,11 @@ let private makeContent (mime: string) (s: string) =
     content
 
 let private makeTextContent = makeContent "text/plain"
+
+let private readEntity (e: MimeEntity) =
+    use stream = new MemoryStream()
+    e.WriteTo stream
+    stream.ToArray()
 
 [<Fact>]
 let ``Authenticated endpoints work when authentication is disabled`` () =
@@ -180,10 +212,8 @@ let ``Minimal import call produces a valid message`` () =
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
-    let from = getHeader "From" called.Headers
-    Assert.NotEqual(0, from.Length)
-    Assert.NotEqual<string>("", List.head from)
+    let called = mock.CalledImport.Value
+    Assert.NotEqual(0, called.Message.From.Count)
 
 [<Fact>]
 let ``Easy curl import works`` () =
@@ -199,15 +229,14 @@ let ``Easy curl import works`` () =
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
+    let called = mock.CalledImport.Value
+
     Assert.Equal(
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        match mock.CalledMessage.Value.Body with
-        | SinglePart s -> s
-        | MultiPart(_ct, c, _a) -> c
+        TextFormat.Text |> called.Message.GetTextBody |> _.Trim()
     )
 
-    let called = mock.CalledMessage.Value
-    Assert.Equivalent([ "text/plain" ], getHeader "Content-Type" called.Headers)
+    Assert.Equal("text/plain", called.Message.Body.ContentType.MimeType)
 
 [<Fact>]
 let ``Easy curl import passes through headers`` () =
@@ -219,9 +248,9 @@ let ``Easy curl import passes through headers`` () =
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
-    Assert.Equivalent([ "bob@example.com" ], getHeader "To" called.Headers)
-    Assert.Equivalent([ "Hello, World!" ], getHeader "Subject" called.Headers)
+    let called = mock.CalledImport.Value
+    Assert.Equal("bob@example.com", called.Message.To.ToString())
+    Assert.Equal("Hello, World!", called.Message.Subject)
 
 [<Fact>]
 let ``Easy curl import passes through Content-Type`` () =
@@ -236,8 +265,8 @@ let ``Easy curl import passes through Content-Type`` () =
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
-    Assert.Equivalent([ "text/html" ], getHeader "Content-Type" called.Headers)
+    let called = mock.CalledImport.Value
+    Assert.Equal("text/html", called.Message.Body.ContentType.MimeType)
 
 [<Fact>]
 let ``Curl import with application/x-www-form-urlencoded works`` () =
@@ -264,20 +293,16 @@ let ``Curl import with application/x-www-form-urlencoded works`` () =
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
+    let called = mock.CalledImport.Value
     Assert.Equivalent(Some [ "INBOX"; "STARRED" ], called.LabelIds)
     Assert.Equivalent(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
     Assert.Equivalent(Some true, called.NeverMarkSpam)
     Assert.Equivalent(Some false, called.ProcessForCalendar)
     Assert.Equivalent(None, called.Deleted)
 
-    Assert.Equivalent(
-        MultiPart(
-            "text/plain",
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            []
-        ),
-        called.Body
+    Assert.Equal(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        TextFormat.Plain |> called.Message.GetTextBody |> _.Trim()
     )
 
 [<Fact>]
@@ -299,8 +324,8 @@ let ``Curl import with application/x-www-form-urlencoded works with non-plain bo
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
-    Assert.Equivalent(MultiPart("text/html", "Hello, <em>World!</em>", []), called.Body)
+    let called = mock.CalledImport.Value
+    Assert.Equal("Hello, <em>World!</em>", TextFormat.Html |> called.Message.GetTextBody |> _.Trim())
 
 [<Fact>]
 let ``Curl import with multipart/form-data works`` () =
@@ -308,7 +333,7 @@ let ``Curl import with multipart/form-data works`` () =
 
     use content = new MultipartFormDataContent()
 
-    for (k, v) in
+    for k, v in
         seq {
             "body",
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
@@ -327,20 +352,16 @@ let ``Curl import with multipart/form-data works`` () =
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
+    let called = mock.CalledImport.Value
     Assert.Equivalent(Some [ "INBOX"; "STARRED" ], called.LabelIds)
     Assert.Equivalent(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
     Assert.Equivalent(Some true, called.NeverMarkSpam)
     Assert.Equivalent(Some false, called.ProcessForCalendar)
     Assert.Equivalent(None, called.Deleted)
 
-    Assert.Equivalent(
-        MultiPart(
-            "text/plain",
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            []
-        ),
-        called.Body
+    Assert.Equal(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        TextFormat.Plain |> called.Message.GetTextBody |> _.Trim()
     )
 
 [<Fact>]
@@ -358,23 +379,26 @@ let ``Curl import with multipart/form-data works with attachments`` () =
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
+    let called = mock.CalledImport.Value
+    Assert.Equal("Hello, World!", TextFormat.Plain |> called.Message.GetTextBody |> _.Trim())
 
-    Assert.Equivalent(
-        MultiPart(
-            "text/plain",
-            "Hello, World!",
-            [ { ContentType = "application/json"
-                Filename = "hello.json"
-                Base64 = "{\"hello\": \"world\"}" |> Encoding.UTF8.GetBytes |> Convert.ToBase64String }
-              { ContentType = "text/html"
-                Filename = "hello.html"
-                Base64 =
-                  "<p>hello <strong>world</strong></p>"
-                  |> Encoding.UTF8.GetBytes
-                  |> Convert.ToBase64String } ]
-        ),
-        called.Body
+    let attachments = mock.CalledImport.Value.Message.Attachments |> Seq.toList
+    Assert.Equal(attachments.Length, 2)
+    Assert.Equal("application/json", attachments[0].ContentType.MimeType)
+    Assert.Equal("hello.json", attachments[0].ContentType.Name)
+    Assert.Equal("text/html", attachments[1].ContentType.MimeType)
+    Assert.Equal("hello.html", attachments[1].ContentType.Name)
+
+    Assert.Contains(
+        "{\"hello\": \"world\"}" |> Encoding.UTF8.GetBytes |> Convert.ToBase64String,
+        attachments[0] |> readEntity |> Encoding.UTF8.GetString
+    )
+
+    Assert.Contains(
+        "<p>hello <strong>world</strong></p>"
+        |> Encoding.UTF8.GetBytes
+        |> Convert.ToBase64String,
+        attachments[1] |> readEntity |> Encoding.UTF8.GetString
     )
 
 [<Fact>]
@@ -390,12 +414,12 @@ let ``Curl import with multipart/form-data works (sort of) with non-plain body``
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
+    let called = mock.CalledImport.Value
     // This would ideally be text/html as originally submitted, but due to
     // limitations in ASP.NET's form-parsing API, that would require a custom
     // parser like https://andrewlock.net/reading-json-and-binary-data-from-multipart-form-data-sections-in-aspnetcore/.
     // Too much work--for now we're not concerned with this niche case.
-    Assert.Equivalent(MultiPart("text/plain", "Hello, <em>World!</em>", []), called.Body)
+    Assert.Equal("Hello, <em>World!</em>", TextFormat.Text |> called.Message.GetTextBody |> _.Trim())
 
 [<Fact>]
 let ``Curl import passes through headers`` () =
@@ -412,6 +436,6 @@ let ``Curl import passes through headers`` () =
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
-    let called = mock.CalledMessage.Value
-    Assert.Equivalent([ "bob@example.com" ], getHeader "To" called.Headers)
-    Assert.Equivalent([ "Hello, World!" ], getHeader "Subject" called.Headers)
+    let called = mock.CalledImport.Value
+    Assert.Equal("bob@example.com", called.Message.To.ToString())
+    Assert.Equal("Hello, World!", called.Message.Subject)

@@ -3,84 +3,50 @@ module Gmaas.Gmail
 open System
 open System.Buffers.Text
 open System.Collections.Generic
-open System.Text
 open System.Threading.Tasks
-open System.Web
 
 open Google.Apis.Gmail.v1
 
-open Gmaas.Helpers
+type InternalDateSourceEnum = UsersResource.MessagesResource.ImportRequest.InternalDateSourceEnum
 
-type Attachment =
-    { ContentType: string
-      Filename: string
-      Base64: string }
+let parseInternalDateSource (s: string) =
+    match s.ToLowerInvariant() with
+    | "receivedtime" -> Ok InternalDateSourceEnum.ReceivedTime
+    | "dateheader" -> Ok InternalDateSourceEnum.DateHeader
+    | _ -> Error(sprintf "unknown internal date source value: %s" s)
 
-type Body =
-    | SinglePart of string
-    | MultiPart of contentType: string * content: string * attachments: Attachment list
+type IGmailInbox =
+    abstract member Import:
+        message: ReadOnlySpan<byte> *
+        ?labelIds: string list *
+        ?internalDateSource: InternalDateSourceEnum *
+        ?neverMarkSpam: bool *
+        ?processForCalendar: bool *
+        ?deleted: bool ->
+            Task<Data.Message>
 
-type Message =
-    { LabelIds: string list option
-      Headers: (string * string) list
-      Body: Body
-      InternalDateSource: InternalDateSourceEnum option
-      NeverMarkSpam: bool option
-      ProcessForCalendar: bool option
-      Deleted: bool option }
+    abstract member Send: message: ReadOnlySpan<byte> -> Task<Data.Message>
 
-let private makeEnvelope (headers: (string * string) list) (body: Body) : string =
-    let body, bodyHeaders =
-        match body with
-        | SinglePart s -> s, List.empty
-        | MultiPart(contentType, content, []) -> content, [ "Content-Type", contentType ]
-        | MultiPart(contentType, content, attachments) ->
-            let boundary = $"boundary_{Guid.NewGuid()}"
-            let content = $"--{boundary}\nContent-Type: {contentType}\n\n{content}"
+type GmailInbox(service: GmailService) =
+    interface IGmailInbox with
+        member _.Import
+            (
+                message: ReadOnlySpan<byte>,
+                ?labelIds: string list,
+                ?internalDateSource: InternalDateSourceEnum,
+                ?neverMarkSpam: bool,
+                ?processForCalendar: bool,
+                ?deleted: bool
+            ) : Task<Data.Message> =
+            let data = Data.Message()
+            data.Raw <- Base64Url.EncodeToString message
+            data.LabelIds <- labelIds |> Option.defaultValue [ "INBOX" ] |> List.insertAt 0 "UNREAD" |> List
 
-            let attachments =
-                attachments
-                |> List.map (fun a ->
-                    let contentType = $"{a.ContentType}; name=\"{HttpUtility.UrlEncode a.Filename}\""
-                    $"--{boundary}\nContent-Type: {contentType}\nContent-Transfer-Encoding: base64\n\n{a.Base64}")
-                |> String.concat "\n\n"
+            let request = service.Users.Messages.Import(data, "me")
+            request.NeverMarkSpam <- neverMarkSpam |> Option.defaultValue true
+            request.ProcessForCalendar <- processForCalendar |> Option.defaultValue false
+            request.Deleted <- deleted |> Option.defaultValue false
+            request.InternalDateSource <- internalDateSource |> Option.defaultValue InternalDateSourceEnum.ReceivedTime
+            request.ExecuteAsync()
 
-            $"{content}\n\n{attachments}\n\n--{boundary}--",
-            [ "Content-Type", $"multipart/mixed; boundary=\"{boundary}\"" ]
-
-    let headers =
-        headers
-        |> overrideHeaders bodyHeaders
-        |> Seq.map (fun (k, v) -> $"{k}: {v}")
-        |> String.concat "\n"
-
-    $"{headers}\n\n{body}\n"
-
-type IGmailFs =
-    abstract member Import: msg: Message -> Task<Data.Message>
-
-type GmailFs(service: GmailService) =
-    interface IGmailFs with
-        member _.Import(msg: Message) : Task<Data.Message> =
-            task {
-                let envelope = makeEnvelope msg.Headers msg.Body
-                let data = Data.Message()
-                data.Raw <- Encoding.UTF8.GetBytes envelope |> Base64Url.EncodeToString
-
-                data.LabelIds <-
-                    msg.LabelIds
-                    |> Option.defaultValue [ "INBOX" ]
-                    |> List.insertAt 0 "UNREAD"
-                    |> List
-
-                let request = service.Users.Messages.Import(data, "me")
-                request.NeverMarkSpam <- msg.NeverMarkSpam |> Option.defaultValue true
-                request.ProcessForCalendar <- msg.ProcessForCalendar |> Option.defaultValue false
-                request.Deleted <- msg.Deleted |> Option.defaultValue false
-
-                request.InternalDateSource <-
-                    msg.InternalDateSource
-                    |> Option.defaultValue InternalDateSourceEnum.ReceivedTime
-
-                return! request.ExecuteAsync()
-            }
+        member _.Send(message: ReadOnlySpan<byte>) : Task<Data.Message> = failwith "Not Implemented"
