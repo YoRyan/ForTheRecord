@@ -7,10 +7,8 @@ open System.Net
 open System.Net.Http
 open System.Net.Http.Headers
 open System.Text
-open System.Threading.Tasks
 
 open Giraffe
-open Google.Apis.Gmail.v1
 open Meziantou.Framework.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.TestHost
@@ -23,39 +21,7 @@ open ForTheRecord.Config
 open ForTheRecord.Gmail
 open ForTheRecord.Http
 
-type private MockGmailInbox() =
-    member val CalledImport: {| Message: MimeMessage
-                                LabelIds: string list option
-                                InternalDateSource: InternalDateSourceEnum option
-                                NeverMarkSpam: bool option
-                                ProcessForCalendar: bool option
-                                Deleted: bool option |} option = None with get, set
-
-    interface IGmailInbox with
-        member this.Import
-            (
-                message: ReadOnlySpan<byte>,
-                ?labelIds: string list,
-                ?internalDateSource: InternalDateSourceEnum,
-                ?neverMarkSpam: bool,
-                ?processForCalendar: bool,
-                ?deleted: bool
-            ) : Task<unit> =
-            use stream = new MemoryStream(message.ToArray())
-            let message = MimeMessage.Load stream
-
-            this.CalledImport <-
-                Some
-                    {| Message = message
-                       LabelIds = labelIds
-                       InternalDateSource = internalDateSource
-                       NeverMarkSpam = neverMarkSpam
-                       ProcessForCalendar = processForCalendar
-                       Deleted = deleted |}
-
-            Task.FromResult()
-
-        member this.Send(message: ReadOnlySpan<byte>) : Task<Data.Message> = failwith "Not Implemented"
+open Mocks
 
 let private getTestApp (config: ServeConfig) =
     let builder = WebApplication.CreateBuilder()
@@ -115,6 +81,27 @@ let private readEntity (e: MimeEntity) =
     use stream = new MemoryStream()
     e.WriteTo stream
     stream.ToArray()
+
+[<Fact>]
+let ``Endpoints not available when Gmail is not configured`` () =
+    let mock = MockImapInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpAddress = ""
+          Inbox = Imap(Set.empty, mock) }
+
+    let request =
+        new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/ez")
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Gone, response.StatusCode)
+
+    use content = new FormUrlEncodedContent(seq { "body", "" } |> Seq.map KeyValuePair)
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import")
+    request.Content <- content
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Gone, response.StatusCode)
 
 [<Fact>]
 let ``Authenticated endpoints work when authentication is disabled`` () =
