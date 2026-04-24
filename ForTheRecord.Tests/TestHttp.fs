@@ -19,9 +19,9 @@ open MimeKit
 open MimeKit.Text
 open Xunit
 
-open Gmaas.Config
-open Gmaas.Gmail
-open Gmaas.Http
+open ForTheRecord.Config
+open ForTheRecord.Gmail
+open ForTheRecord.Http
 
 type private MockGmailInbox() =
     member val CalledImport: {| Message: MimeMessage

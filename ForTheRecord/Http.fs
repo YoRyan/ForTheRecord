@@ -1,4 +1,4 @@
-module Gmaas.Http
+module ForTheRecord.Http
 
 open System.IO
 open System.Security.Claims
@@ -12,8 +12,8 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 open MimeKit
 
-open Gmaas.Config
-open Gmaas.Gmail
+open ForTheRecord.Config
+open ForTheRecord.Gmail
 
 module private Realms =
     [<Literal>]
@@ -48,7 +48,7 @@ let private mapHeaders (ctx: HttpContext) =
         [ if not (List.exists (fun (k: string, _) -> k.ToLowerInvariant() = "from") headers) then
               "From",
               (match ctx.User.FindFirst ClaimTypes.NameIdentifier with
-               | null -> "gmaas"
+               | null -> "ForTheRecord"
                | c -> c.Value)
           yield! headers ]
 

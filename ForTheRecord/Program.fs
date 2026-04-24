@@ -4,8 +4,8 @@ open System.Threading.Tasks
 open Tomlyn
 open Tomlyn.Model
 
-open Gmaas.Config
-open Gmaas.Http
+open ForTheRecord.Config
+open ForTheRecord.Http
 
 let doAuth (configFile: FileInfo) =
     task {
@@ -31,7 +31,9 @@ let main arg =
         config.Required <- true
         config.Recursive <- true
 
-        let root = System.CommandLine.RootCommand "gmaas: Gmail as a Service"
+        let root =
+            System.CommandLine.RootCommand "ForTheRecord: Import notifications into your inbox."
+
         root.Add config
 
         let auth =

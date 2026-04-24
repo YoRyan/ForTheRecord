@@ -1,4 +1,4 @@
-module Gmaas.Gmail
+module ForTheRecord.Gmail
 
 open System
 open System.Buffers.Text

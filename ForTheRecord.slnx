@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ForTheRecord.Tests/ForTheRecord.Tests.fsproj" />
+  <Project Path="ForTheRecord/ForTheRecord.fsproj" />
+</Solution>

@@ -1,4 +1,4 @@
-module Gmaas.Config
+module ForTheRecord.Config
 
 open System
 open System.IO
@@ -14,13 +14,13 @@ open Google.Apis.Util.Store
 open Meziantou.Framework.Http
 open Tomlyn.Model
 
-open Gmaas.Gmail
+open ForTheRecord.Gmail
 
 [<Literal>]
 let private defaultHttp = "http://[::1]:8080"
 
 [<Literal>]
-let private applicationName = "gmaas"
+let private applicationName = "ForTheRecord"
 
 [<Literal>]
 let private userId = "user"

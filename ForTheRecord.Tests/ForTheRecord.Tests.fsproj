@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Gmaas\Gmaas.fsproj" />
+    <ProjectReference Include="..\ForTheRecord\ForTheRecord.fsproj" />
   </ItemGroup>
 
 </Project>
