@@ -9,11 +9,13 @@
     <Compile Include="Gmail.fs" />
     <Compile Include="Imap.fs" />
     <Compile Include="Config.fs" />
+    <Compile Include="Liquid.fs" />
     <Compile Include="Http.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Fluid.Core" Version="2.31.0" />
     <PackageReference Include="Giraffe" Version="8.2.0" />
     <PackageReference Include="Google.Apis.Gmail.v1" Version="1.73.0.4029" />
     <PackageReference Include="idunno.Authentication.Basic" Version="2.4.0" />

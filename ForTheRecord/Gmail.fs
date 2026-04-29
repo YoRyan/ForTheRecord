@@ -12,6 +12,7 @@ open Google.Apis.Auth.OAuth2.Flows
 open Google.Apis.Auth.OAuth2.Responses
 open Google.Apis.Gmail.v1
 open Google.Apis.Util.Store
+open MimeKit
 
 [<Literal>]
 let private userId = "user"
@@ -76,7 +77,7 @@ let loadCredentials (codeReceiver: ICodeReceiver) (file: FileInfo) (store: Direc
 
 type IGmailInbox =
     abstract member Import:
-        message: ReadOnlySpan<byte> *
+        message: Stream *
         ?labelIds: string list *
         ?internalDateSource: InternalDateSourceEnum *
         ?neverMarkSpam: bool *
@@ -84,32 +85,89 @@ type IGmailInbox =
         ?deleted: bool ->
             Task<unit>
 
-    abstract member Send: message: ReadOnlySpan<byte> -> Task<Data.Message>
+    abstract member Send: message: Stream -> Task<unit>
 
 type GmailInbox(service: GmailService) =
     interface IGmailInbox with
         member _.Import
             (
-                message: ReadOnlySpan<byte>,
+                message: Stream,
                 ?labelIds: string list,
                 ?internalDateSource: InternalDateSourceEnum,
                 ?neverMarkSpam: bool,
                 ?processForCalendar: bool,
                 ?deleted: bool
-            ) : Task<unit> =
-            let data = Data.Message()
-            data.Raw <- Base64Url.EncodeToString message
-            data.LabelIds <- labelIds |> Option.defaultValue [ "INBOX" ] |> List.insertAt 0 "UNREAD" |> List
-
-            let request = service.Users.Messages.Import(data, "me")
-            request.NeverMarkSpam <- neverMarkSpam |> Option.defaultValue true
-            request.ProcessForCalendar <- processForCalendar |> Option.defaultValue false
-            request.Deleted <- deleted |> Option.defaultValue false
-            request.InternalDateSource <- internalDateSource |> Option.defaultValue InternalDateSourceEnum.ReceivedTime
-
+            ) =
             task {
+                // Base64Url takes a byte array, which means we need to read the
+                // entire stream into memory. Fortunately, emails aren't very big...
+                use stream = new MemoryStream()
+                do! message.CopyToAsync stream
+
+                let data = Data.Message()
+                data.Raw <- Base64Url.EncodeToString(stream.ToArray())
+                data.LabelIds <- labelIds |> Option.defaultValue [ "INBOX" ] |> List.insertAt 0 "UNREAD" |> List
+
+                let request = service.Users.Messages.Import(data, "me")
+                request.NeverMarkSpam <- neverMarkSpam |> Option.defaultValue true
+                request.ProcessForCalendar <- processForCalendar |> Option.defaultValue false
+                request.Deleted <- deleted |> Option.defaultValue false
+
+                request.InternalDateSource <-
+                    internalDateSource |> Option.defaultValue InternalDateSourceEnum.ReceivedTime
+
                 let! _ = request.ExecuteAsync()
                 return ()
             }
 
-        member _.Send(message: ReadOnlySpan<byte>) : Task<Data.Message> = failwith "Not Implemented"
+        member _.Send(message: Stream) : Task<unit> = failwith "Not Implemented"
+
+/// Import a finalized message to Gmail, using special headers to determine
+/// which Gmail flags and metadata to apply.
+let importToGmailWithHeaders (inbox: IGmailInbox) (message: Stream) =
+    task {
+        // Copy the entire stream to ensure we can read it again for the import.
+        // Again, emails are fortunately not very big...
+        use stream = new MemoryStream()
+        do! message.CopyToAsync stream
+        stream.Seek(0, SeekOrigin.Begin) |> ignore
+
+        let! parsed = MimeMessage.LoadAsync stream
+        let headers = parsed.Headers
+
+        let labelIds =
+            (None, headers)
+            ||> Seq.fold (fun state h ->
+                if h.Field.ToLowerInvariant() = "x-ftr-gmail-labelid" then
+                    let labelId = h.Value
+
+                    match state with
+                    | Some s -> Set.add labelId s
+                    | None -> Set.singleton labelId
+                    |> Some
+                else
+                    state)
+            |> Option.map (fun s -> List.ofSeq s)
+
+        let readBool (field: string) =
+            match headers[field] with
+            | null -> None
+            | s ->
+                let ok, result = Boolean.TryParse s
+                if ok then Some result else None
+
+        stream.Seek(0, SeekOrigin.Begin) |> ignore
+
+        return!
+            inbox.Import(
+                stream,
+                ?labelIds = labelIds,
+                ?internalDateSource =
+                    (match headers["x-ftr-gmail-internaldatesource"] with
+                     | null -> None
+                     | s -> parseInternalDateSource s |> Result.toOption),
+                ?neverMarkSpam = readBool "x-ftr-gmail-nevermarkspam",
+                ?processForCalendar = readBool "x-ftr-gmail-processforcalendar",
+                ?deleted = readBool "x-ftr-gmail-deleted"
+            )
+    }

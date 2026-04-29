@@ -4,7 +4,6 @@ open System
 open System.IO
 open System.Threading.Tasks
 
-open Google.Apis.Gmail.v1
 open MimeKit
 
 open ForTheRecord.Gmail
@@ -21,19 +20,16 @@ type MockGmailInbox() =
     interface IGmailInbox with
         member this.Import
             (
-                message: ReadOnlySpan<byte>,
+                message: Stream,
                 ?labelIds: string list,
                 ?internalDateSource: InternalDateSourceEnum,
                 ?neverMarkSpam: bool,
                 ?processForCalendar: bool,
                 ?deleted: bool
             ) : Task<unit> =
-            use stream = new MemoryStream(message.ToArray())
-            let message = MimeMessage.Load stream
-
             this.CalledImport <-
                 Some
-                    {| Message = message
+                    {| Message = MimeMessage.Load message
                        LabelIds = labelIds
                        InternalDateSource = internalDateSource
                        NeverMarkSpam = neverMarkSpam
@@ -42,9 +38,9 @@ type MockGmailInbox() =
 
             Task.FromResult()
 
-        member this.Send(message: ReadOnlySpan<byte>) : Task<Data.Message> = failwith "Not Implemented"
+        member this.Send(message: Stream) : Task<unit> = failwith "Not Implemented"
 
 type MockImapInbox() =
     interface IImapInbox with
-        member this.Append(message: ReadOnlySpan<byte>, flag: string list option, date: DateTime option) : Task<unit> =
+        member this.Append(message: Stream, flag: string list option, date: DateTime option) : Task<unit> =
             failwith "Not Implemented"

@@ -1,10 +1,14 @@
 module ForTheRecord.Http
 
+open System
+open System.Collections.Generic
 open System.IO
 open System.Security.Claims
 open System.Text
+open System.Text.Json
 open System.Threading.Tasks
 
+open Fluid
 open Giraffe
 open idunno.Authentication.Basic
 open Microsoft.AspNetCore.Http
@@ -14,6 +18,7 @@ open MimeKit
 
 open ForTheRecord.Config
 open ForTheRecord.Gmail
+open ForTheRecord.Liquid
 
 module private Realms =
     [<Literal>]
@@ -37,6 +42,11 @@ let private parseContentType (s: string) =
     else
         Error(sprintf "Invalid MIME content type: %s" s)
 
+let private authenticatedUser (ctx: HttpContext) =
+    match ctx.User.FindFirst ClaimTypes.NameIdentifier with
+    | null -> None
+    | c -> Some c.Value
+
 let private mapHeaders (ctx: HttpContext) =
     let headers, contentTypeHeaders =
         ctx.Request.Headers
@@ -49,10 +59,7 @@ let private mapHeaders (ctx: HttpContext) =
     // All emails must at least have a valid From: field.
     let headersWithFrom =
         [ if not (List.exists (fun (k: string, _) -> k.ToLowerInvariant() = "from") headers) then
-              "From",
-              (match ctx.User.FindFirst ClaimTypes.NameIdentifier with
-               | null -> "ForTheRecord"
-               | c -> c.Value)
+              "From", authenticatedUser ctx |> Option.defaultValue "ForTheRecord"
           yield! headers ]
 
     let headerList = HeaderList()
@@ -85,8 +92,9 @@ let private ezImportHandler: HttpHandler =
 
             use stream = new MemoryStream()
             do! message.WriteToAsync stream
+            stream.Seek(0, SeekOrigin.Begin) |> ignore
 
-            let! _ = (getGmailInbox config).Import(stream.ToArray())
+            do! (getGmailInbox config).Import stream
 
             return! next ctx
         }
@@ -147,11 +155,12 @@ let private importHandler: HttpHandler =
 
             use stream = new MemoryStream()
             do! message.WriteToAsync stream
+            stream.Seek(0, SeekOrigin.Begin) |> ignore
 
-            let! _ =
+            do!
                 (getGmailInbox config)
                     .Import(
-                        stream.ToArray(),
+                        stream,
                         ?labelIds = form.LabelId,
                         ?internalDateSource =
                             (form.InternalDateSource
@@ -198,6 +207,95 @@ let private requiresRole role =
             next
             ctx
 
+let private genericGmailJsonHandler (message: Stream) : HttpHandler =
+    handleContext(fun ctx ->
+        task {
+            let config = ctx.GetService<ServeConfig>()
+            do! importToGmailWithHeaders (getGmailInbox config) message
+            return Some ctx
+        }
+    )
+
+let private genericImapJsonHandler (message: Stream) : HttpHandler =
+    fun (next: HttpFunc) (ctx: HttpContext) -> failwith "Not Implemented"
+
+let private genericJsonHandler (template: string) : HttpHandler =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        task {
+            let config = ctx.GetService<ServeConfig>()
+            let parser = ctx.GetService<FluidParser>()
+
+            let ok, template, error = parser.TryParse template
+
+            if not ok then
+                failwithf "Failed to parse template: %s" error
+
+            let! json = ctx.BindJsonAsync<JsonElement>()
+            let json = jsonLiquidModel json
+
+            let ftr =
+                [ "user", authenticatedUser ctx |> Option.defaultValue null
+                  "guid", Guid.NewGuid().ToString() ]
+                |> dict
+
+            let context =
+                TemplateContext(
+                    seq<string * obj> {
+                        match json with
+                        | :? IDictionary<string, obj> as d -> yield! d |> Seq.map (|KeyValue|)
+                        | _ -> ()
+
+                        "json", json
+                        "ftr", ftr
+                    }
+                    |> dict
+                )
+
+            let! render = template.RenderAsync context
+            use stream = new MemoryStream(Encoding.UTF8.GetBytes render)
+
+            let handler =
+                hasContentType
+                    "application/json"
+                    { InvalidHeaderValue = None
+                      HeaderNotFound = None }
+                >=> match config.Inbox with
+                    | Gmail _ -> requiresRole Roles.gmailInsert >=> genericGmailJsonHandler stream
+                    | Imap _ -> requiresRole Roles.imapAppend >=> genericImapJsonHandler stream
+
+            return! handler next ctx
+        }
+
+
+let private appriseHandler: HttpHandler =
+    genericJsonHandler
+        """From: Apprise via ForTheRecord <me>
+To: me
+Subject: [{{ type }}] {{ title }}
+{% if type == "failure" -%}
+X-FTR-Gmail-LabelID: INBOX
+X-FTR-Gmail-LabelID: STARRED
+{% endif -%}
+Content-Type: multipart/mixed; boundary={{ ftr.guid }}
+
+--{{ ftr.guid }}
+{% if forcefarmot == "html" -%}
+Content-Type: text/html
+{% else -%}
+Content-Type: text/plain
+{% endif -%}
+
+{{ message }}
+{% for attach in attachments -%}
+--{{ ftr.guid }}
+Content-Type: {{ attach.mimetype }}; name="{{ attach.filename | escape }}"
+Content-Transfer-Encoding: base64
+
+{{ attach.base64 }}
+{% endfor -%}
+--{{ ftr.guid }}--
+"""
+
 let webApp =
     choose
         [ POST
@@ -209,7 +307,8 @@ let webApp =
                     route "/api/gmail/messages/import"
                     >=> requiresRole Roles.gmailInsert
                     >=> requiresGmail
-                    >=> importHandler ]
+                    >=> importHandler
+                    route "/apprise" >=> appriseHandler ]
           RequestErrors.NOT_FOUND "404" ]
 
 let private validateCredentials (context: ValidateCredentialsContext) =
@@ -258,7 +357,8 @@ let configureServices (config: ServeConfig) (services: IServiceCollection) =
             ())
     |> ignore
 
-    services.AddSingleton<ServeConfig>(config).AddGiraffe() |> ignore
+    services.AddSingleton<ServeConfig>(config).AddSingleton<FluidParser>(FluidParser()).AddGiraffe()
+    |> ignore
 
 let serveHttpAsync (config: ServeConfig) =
     task {
