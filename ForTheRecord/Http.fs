@@ -75,8 +75,8 @@ let private mapHeaders (ctx: HttpContext) =
 
     headerList, contentType
 
-let private ezImportHandler: HttpHandler =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
+let private ezImportHandler =
+    handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
             let messageHeaders, contentType = mapHeaders ctx
@@ -96,8 +96,8 @@ let private ezImportHandler: HttpHandler =
 
             do! (getGmailInbox config).Import stream
 
-            return! next ctx
-        }
+            return Some ctx
+        })
 
 [<CLIMutable>]
 type ImportForm =
@@ -123,8 +123,8 @@ let private readAttachment (file: IFormFile) =
     attach.FileName <- file.FileName
     attach
 
-let private importHandler: HttpHandler =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
+let private importHandler =
+    handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
             let! form = ctx.BindFormAsync<ImportForm>()
@@ -170,8 +170,8 @@ let private importHandler: HttpHandler =
                         ?deleted = form.Deleted
                     )
 
-            return! next ctx
-        }
+            return Some ctx
+        })
 
 let private requiresGmail =
     fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -207,14 +207,13 @@ let private requiresRole role =
             next
             ctx
 
-let private genericGmailJsonHandler (message: Stream) : HttpHandler =
-    handleContext(fun ctx ->
+let private genericGmailJsonHandler (message: Stream) =
+    handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
             do! importToGmailWithHeaders (getGmailInbox config) message
             return Some ctx
-        }
-    )
+        })
 
 let private genericImapJsonHandler (message: Stream) : HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) -> failwith "Not Implemented"
