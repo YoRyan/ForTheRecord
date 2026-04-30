@@ -14,9 +14,6 @@ open ForTheRecord.Helpers
 open ForTheRecord.Imap
 
 [<Literal>]
-let private defaultHttp = "http://[::1]:8080"
-
-[<Literal>]
 let private applicationName = "ForTheRecord"
 
 type ConfiguredInbox =
@@ -25,7 +22,7 @@ type ConfiguredInbox =
 
 type ServeConfig =
     { Htpasswd: HtpasswdFile option
-      HttpAddress: string
+      HttpUrls: string list option
       AppriseTemplates: Map<string, string>
       Inbox: ConfiguredInbox }
 
@@ -52,11 +49,11 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
                 |> inTable "auth"
                 |> Option.bind (inTable<string> "htpasswd")
                 |> Option.map HtpasswdFile.Parse
-              HttpAddress =
+              HttpUrls =
                 t
                 |> inTable "http"
-                |> Option.bind (inTable "address")
-                |> Option.defaultValue defaultHttp
+                |> Option.bind (inTable "urls")
+                |> Option.map asList
               AppriseTemplates =
                 t
                 |> inTable "apprise"

@@ -11,6 +11,7 @@ open System.Threading.Tasks
 open Fluid
 open Giraffe
 open idunno.Authentication.Basic
+open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
@@ -379,10 +380,16 @@ let configureServices (config: ServeConfig) (services: IServiceCollection) =
     services.AddSingleton<ServeConfig>(config).AddSingleton<FluidParser>(FluidParser()).AddGiraffe()
     |> ignore
 
+let configureWebHost (config: ServeConfig) (builder: IWebHostBuilder) =
+    match config.HttpUrls with
+    | Some urls -> builder.UseUrls(List.toArray urls) |> ignore
+    | None -> ()
+
 let serveHttpAsync (config: ServeConfig) =
     task {
         let builder = WebApplication.CreateBuilder()
         configureServices config builder.Services
+        configureWebHost config builder.WebHost
 
         let app = builder.Build()
         app.UseAuthentication() |> ignore
