@@ -49,11 +49,7 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
                 |> inTable "auth"
                 |> Option.bind (inTable<string> "htpasswd")
                 |> Option.map HtpasswdFile.Parse
-              HttpUrls =
-                t
-                |> inTable "http"
-                |> Option.bind (inTable "urls")
-                |> Option.map asList
+              HttpUrls = t |> inTable "http" |> Option.bind (inTable "urls") |> Option.map asList
               AppriseTemplates =
                 t
                 |> inTable "apprise"
