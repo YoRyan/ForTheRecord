@@ -30,11 +30,7 @@ type ServeConfig =
       Inbox: ConfiguredInbox }
 
 let private inTable<'T> k (t: TomlTable) =
-    t.TryGetValue k
-    |> tryGetOption
-    |> Option.bind (function
-        | :? 'T as v -> Some v
-        | _ -> None)
+    t.TryGetValue k |> tryGetOption |> Option.bind tryDowncast<'T>
 
 let private asList<'T> (a: TomlArray) : 'T list = Seq.cast<'T> a |> Seq.toList
 
@@ -43,10 +39,7 @@ let private asTableList (ta: TomlTableArray) : TomlTable list = ta |> Seq.toList
 let private asMap<'V> (t: TomlTable) : Map<string, 'V> =
     t
     |> Seq.map (|KeyValue|)
-    |> Seq.choose (fun (k, v) ->
-        match v with
-        | :? 'V as cast -> Some(k, cast)
-        | _ -> None)
+    |> Seq.choose (fun (k, v) -> v |> tryDowncast<'V> |> Option.map (fun cast -> k, cast))
     |> Map.ofSeq
 
 let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: TomlTable) =

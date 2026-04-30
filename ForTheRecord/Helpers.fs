@@ -2,6 +2,12 @@ module ForTheRecord.Helpers
 
 open System.Text.Json
 
+/// Attempt a downcast without raising an exception if it fails.
+let tryDowncast<'T> (o: obj) =
+    match o with
+    | :? 'T as v -> Some v
+    | _ -> None
+
 /// Convenience function to transform return values from C#-style TryGet...()
 /// functions into F# options.
 let tryGetOption<'T> =

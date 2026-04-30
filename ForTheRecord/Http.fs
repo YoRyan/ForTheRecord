@@ -239,9 +239,9 @@ let private genericJsonHandler (template: string) (json: JsonElement) : HttpHand
             let context =
                 TemplateContext(
                     seq<string * obj> {
-                        match json with
-                        | :? IDictionary<string, obj> as d -> yield! d |> Seq.map (|KeyValue|)
-                        | _ -> ()
+                        match tryDowncast<IDictionary<string, obj>> json with
+                        | Some d -> yield! d |> Seq.map (|KeyValue|)
+                        | None -> ()
 
                         "json", json
                         "ftr", ftr
