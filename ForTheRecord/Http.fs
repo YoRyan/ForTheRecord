@@ -20,6 +20,7 @@ open MimeKit
 open ForTheRecord.Config
 open ForTheRecord.Gmail
 open ForTheRecord.Helpers
+open ForTheRecord.Liquid
 
 module private Realms =
     [<Literal>]
@@ -237,6 +238,8 @@ let private genericJsonHandler (template: string) (json: JsonElement) : HttpHand
                   "guid", Guid.NewGuid().ToString() ]
                 |> dict
 
+            let options = ctx.GetService<TemplateOptions>()
+
             let context =
                 TemplateContext(
                     seq<string * obj> {
@@ -247,7 +250,8 @@ let private genericJsonHandler (template: string) (json: JsonElement) : HttpHand
                         "json", json
                         "ftr", ftr
                     }
-                    |> dict
+                    |> dict,
+                    options
                 )
 
             let! render = template.RenderAsync context
@@ -290,7 +294,8 @@ To: me
 {% capture type %}{% case type -%}
 {% when "info" %}ℹ️{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️
 {%- else %}[{{ type }}]{% endcase %}{% endcapture -%}
-Subject: {{ type }} {{ title }}
+{% capture subject %}{{ type }} {{ title }}{% endcapture -%}
+Subject: {{ subject | ftr_encode_base64 }}
 {% if type == "failure" -%}
 X-FTR-Gmail-LabelID: INBOX
 X-FTR-Gmail-LabelID: STARRED
@@ -380,7 +385,11 @@ let configureServices (config: ServeConfig) (services: IServiceCollection) =
             ())
     |> ignore
 
-    services.AddSingleton<ServeConfig>(config).AddSingleton<FluidParser>(FluidParser()).AddGiraffe()
+    services
+        .AddSingleton<ServeConfig>(config)
+        .AddSingleton<FluidParser>(FluidParser())
+        .AddSingleton<TemplateOptions>(createTemplateOptions ())
+        .AddGiraffe()
     |> ignore
 
 let configureWebHost (config: ServeConfig) (builder: IWebHostBuilder) =
