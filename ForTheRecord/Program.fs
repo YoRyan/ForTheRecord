@@ -9,14 +9,14 @@ open ForTheRecord.Http
 
 let doTestGmail (configFile: FileInfo) =
     task {
-        use configFile = configFile.Open FileMode.Open
+        use configFile = configFile.OpenRead()
         let config = TomlSerializer.Deserialize<TomlTable> configFile
         return! testGmail config
     }
 
 let doServeGmail (configFile: FileInfo) =
     task {
-        use configFile = configFile.Open FileMode.Open
+        use configFile = configFile.OpenRead()
         let config = TomlSerializer.Deserialize<TomlTable> configFile
         let! config = loadServeConfig loadGmailConfig config
 
