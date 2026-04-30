@@ -299,7 +299,7 @@ X-FTR-Gmail-LabelID: STARRED
 {% when "info" %}ℹ️{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️
 {%- else %}[{{ type }}]{% endcase %}{% endcapture -%}
 {% capture subject %}{{ type }} {{ title }}{% endcapture -%}
-Subject: {{ subject | ftr_encode_base64 }}
+Subject: {{ subject | ftr_encode_utf8 }}
 Content-Type: multipart/mixed; boundary={{ ftr.guid }}
 
 --{{ ftr.guid }}

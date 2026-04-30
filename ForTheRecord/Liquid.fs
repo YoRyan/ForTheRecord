@@ -9,9 +9,9 @@ open Fluid
 open Fluid.Values
 
 type Filters() =
-    /// Encodes an UTF-8 string inline with base64 so that it is safe for use in
-    /// email headers.
-    static member encodeBase64 (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
+    /// Encodes an UTF-8 string inline so that it is safe for use in email
+    /// headers.
+    static member encodeUtf8 (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
         input
         |> _.ToStringValue()
         |> Encoding.UTF8.GetBytes
@@ -25,7 +25,7 @@ type Filters() =
 let createTemplateOptions () =
     let options = TemplateOptions()
 
-    for name, d in seq { "ftr_encode_base64", Filters.encodeBase64 } do
+    for name, d in seq { "ftr_encode_utf8", Filters.encodeUtf8 } do
         options.Filters.AddFilter(name, FilterDelegate d)
 
     options
