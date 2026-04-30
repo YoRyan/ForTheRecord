@@ -289,17 +289,17 @@ let private appriseHandler: HttpHandler =
         let config = ctx.GetService<ServeConfig>()
 
         genericJsonHandlerWithTemplateMap
-            """From: Apprise via ForTheRecord <me>
-To: me
+            """To: me
+From: Apprise via ForTheRecord <me>
+{% if type == "failure" -%}
+X-FTR-Gmail-LabelID: INBOX
+X-FTR-Gmail-LabelID: STARRED
+{% endif -%}
 {% capture type %}{% case type -%}
 {% when "info" %}ℹ️{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️
 {%- else %}[{{ type }}]{% endcase %}{% endcapture -%}
 {% capture subject %}{{ type }} {{ title }}{% endcapture -%}
 Subject: {{ subject | ftr_encode_base64 }}
-{% if type == "failure" -%}
-X-FTR-Gmail-LabelID: INBOX
-X-FTR-Gmail-LabelID: STARRED
-{% endif -%}
 Content-Type: multipart/mixed; boundary={{ ftr.guid }}
 
 --{{ ftr.guid }}
