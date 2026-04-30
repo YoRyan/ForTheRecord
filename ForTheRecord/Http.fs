@@ -287,7 +287,10 @@ let private appriseHandler: HttpHandler =
         genericJsonHandlerWithTemplateMap
             """From: Apprise via ForTheRecord <me>
 To: me
-Subject: [{{ type }}] {{ title }}
+{% capture type %}{% case type -%}
+{% when "info" %}ℹ️{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️
+{%- else %}[{{ type }}]{% endcase %}{% endcapture -%}
+Subject: {{ type }} {{ title }}
 {% if type == "failure" -%}
 X-FTR-Gmail-LabelID: INBOX
 X-FTR-Gmail-LabelID: STARRED
