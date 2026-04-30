@@ -48,7 +48,11 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
         let! inbox = loadInboxConfig t
 
         return
-            { Htpasswd = t |> inTable<string> "htpasswd" |> Option.map HtpasswdFile.Parse
+            { Htpasswd =
+                t
+                |> inTable "auth"
+                |> Option.bind (inTable<string> "htpasswd")
+                |> Option.map HtpasswdFile.Parse
               HttpAddress = http |> Option.bind (inTable "address") |> Option.defaultValue defaultHttp
               Inbox = inbox }
     }
