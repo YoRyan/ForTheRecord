@@ -278,7 +278,7 @@ let private genericJsonHandlerWithTemplateMap (defaultTemplate: string) (map: Ma
                 tryJsonProperty "ftr_template" json
                 |> Option.map _.ToString()
                 |> Option.map map.TryGetValue
-                |> Option.bind tryGetOption
+                |> Option.bind tryGetByref
                 |> Option.defaultValue defaultTemplate
 
             return! genericJsonHandler template json next ctx

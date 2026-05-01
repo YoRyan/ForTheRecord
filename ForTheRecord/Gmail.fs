@@ -14,6 +14,8 @@ open Google.Apis.Gmail.v1
 open Google.Apis.Util.Store
 open MimeKit
 
+open ForTheRecord.Helpers
+
 [<Literal>]
 let private userId = "user"
 
@@ -147,14 +149,12 @@ let importToGmailWithHeaders (inbox: IGmailInbox) (message: Stream) =
                     |> Some
                 else
                     state)
-            |> Option.map (fun s -> List.ofSeq s)
+            |> Option.map List.ofSeq
 
         let readBool (field: string) =
             match headers[field] with
             | null -> None
-            | s ->
-                let ok, result = Boolean.TryParse s
-                if ok then Some result else None
+            | s -> s |> Boolean.TryParse |> tryGetByref
 
         stream.Seek(0, SeekOrigin.Begin) |> ignore
 

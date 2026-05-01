@@ -27,7 +27,7 @@ type ServeConfig =
       Inbox: ConfiguredInbox }
 
 let private inTable<'T> k (t: TomlTable) =
-    t.TryGetValue k |> tryGetOption |> Option.bind tryDowncast<'T>
+    t.TryGetValue k |> tryGetByref |> Option.bind tryDowncast<'T>
 
 let private asList<'T> (a: TomlArray) : 'T list = Seq.cast<'T> a |> Seq.toList
 

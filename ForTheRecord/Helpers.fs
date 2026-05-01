@@ -10,7 +10,7 @@ let tryDowncast<'T> (o: obj) =
 
 /// Convenience function to transform return values from C#-style TryGet...()
 /// functions into F# options.
-let tryGetOption<'T> =
+let tryGetByref<'T> =
     function
     | (true, v: 'T) -> Some v
     | false, _ -> None
@@ -20,5 +20,5 @@ let tryGetOption<'T> =
 /// usually (but need not necessarily be) an object.
 let tryJsonProperty (name: string) (js: JsonElement) : JsonElement option =
     match js.ValueKind with
-    | JsonValueKind.Object -> js.TryGetProperty name |> tryGetOption
+    | JsonValueKind.Object -> js.TryGetProperty name |> tryGetByref
     | _ -> None
