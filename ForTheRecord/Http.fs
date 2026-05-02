@@ -296,7 +296,7 @@ X-FTR-Gmail-LabelID: INBOX
 X-FTR-Gmail-LabelID: STARRED
 {% endif -%}
 {% capture type %}{% case type -%}
-{% when "info" %}ℹ️{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️
+{% when "info" %}📢{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️
 {%- else %}[{{ type }}]{% endcase %}{% endcapture -%}
 {% capture subject %}{{ type }} {{ title }}{% endcapture -%}
 Subject: {{ subject | ftr_encode_utf8 }}
