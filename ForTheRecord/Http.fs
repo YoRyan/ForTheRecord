@@ -37,12 +37,12 @@ module private Roles =
     let imapAppend = "ImapAppend"
 
 let private parseContentType (s: string) =
-    let (ok, ct) = ContentType.TryParse(s)
-
-    if ok then
-        Ok ct
-    else
-        Error(sprintf "Invalid MIME content type: %s" s)
+    s
+    |> ContentType.TryParse
+    |> tryGetByref
+    |> function
+        | Some ct -> Ok ct
+        | None -> s |> sprintf "Invalid MIME content type: %s" |> Error
 
 let private authenticatedUser (ctx: HttpContext) =
     match ctx.User.FindFirst ClaimTypes.NameIdentifier with
