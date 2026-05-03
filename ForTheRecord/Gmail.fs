@@ -126,7 +126,7 @@ type GmailInbox(service: GmailService) =
 
 /// Import a finalized message to Gmail, using special headers to determine
 /// which Gmail flags and metadata to apply.
-let importToGmailWithHeaders (inbox: IGmailInbox) (message: Stream) =
+let importWholeMessageToGmail (inbox: IGmailInbox) (message: Stream) =
     task {
         // Copy the entire stream to ensure we can read it again for the import.
         // Again, emails are fortunately not very big...

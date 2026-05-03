@@ -213,7 +213,7 @@ let private genericGmailJsonHandler (message: Stream) =
     handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
-            do! importToGmailWithHeaders (getGmailInbox config) message
+            do! importWholeMessageToGmail (getGmailInbox config) message
             return Some ctx
         })
 

@@ -440,3 +440,101 @@ let ``Curl import passes through headers`` () =
     let called = mock.CalledImport.Value
     Assert.Equal("bob@example.com", called.Message.To.ToString())
     Assert.Equal("Hello, World!", called.Message.Subject)
+
+[<Fact>]
+let ``Whole message import works`` () =
+    let _, mock = mockWithoutAuth ()
+
+    let message =
+        """From: me
+To: me
+Subject: Hello, World!
+Content-Type: text/plain
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+"""
+
+    use stream = new MemoryStream(Encoding.UTF8.GetBytes message)
+
+    importWholeMessageToGmail mock stream
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equal(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        TextFormat.Text |> called.Message.GetTextBody |> _.Trim()
+    )
+
+    Assert.Equal("Hello, World!", called.Message.Subject)
+    Assert.Equal("text/plain", called.Message.Body.ContentType.MimeType)
+
+[<Fact>]
+let ``Whole message import works with labels`` () =
+    let _, mock = mockWithoutAuth ()
+
+    let message =
+        """From: me
+To: me
+Subject: Hello, World!
+X-FTR-Gmail-LabelID: INBOX
+X-FTR-Gmail-LabelID: MyAwesomeLabel
+X-FTR-Gmail-LabelID: MyAwesomeLabel2
+Content-Type: text/plain
+
+This is the label test message.
+"""
+
+    use stream = new MemoryStream(Encoding.UTF8.GetBytes message)
+
+    importWholeMessageToGmail mock stream
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
+
+    let called = mock.CalledImport.Value
+
+    let expected =
+        seq {
+            "INBOX"
+            "MyAwesomeLabel"
+            "MyAwesomeLabel2"
+        }
+        |> Set.ofSeq
+
+    Assert.Equivalent(expected, called.LabelIds |> Option.defaultValue [] |> Set.ofList)
+    Assert.Equal(None, called.InternalDateSource)
+    Assert.Equal(None, called.NeverMarkSpam)
+    Assert.Equal(None, called.ProcessForCalendar)
+    Assert.Equal(None, called.Deleted)
+
+[<Fact>]
+let ``Whole message import works with flags`` () =
+    let _, mock = mockWithoutAuth ()
+
+    let message =
+        """From: me
+To: me
+Subject: Hello, World!
+X-FTR-Gmail-InternalDateSource: dateheader
+X-FTR-Gmail-NeverMarkSpam: true
+X-FTR-Gmail-ProcessForCalendar: nonsensevalue
+X-FTR-Gmail-Deleted: false
+Content-Type: text/plain
+
+This is the label test message.
+"""
+
+    use stream = new MemoryStream(Encoding.UTF8.GetBytes message)
+
+    importWholeMessageToGmail mock stream
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equal(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
+    Assert.Equal(Some true, called.NeverMarkSpam)
+    Assert.Equal(None, called.ProcessForCalendar)
+    Assert.Equal(Some false, called.Deleted)
+    Assert.Equivalent(Set.empty, called.LabelIds |> Option.defaultValue [] |> Set.ofList)
