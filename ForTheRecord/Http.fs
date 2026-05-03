@@ -258,19 +258,19 @@ let private genericJsonHandler (template: string) (json: JsonElement) : HttpHand
             use stream = new MemoryStream(Encoding.UTF8.GetBytes render)
 
             let handler =
-                hasContentType
-                    "application/json"
-                    { InvalidHeaderValue = None
-                      HeaderNotFound = None }
-                >=> match config.Inbox with
-                    | Gmail _ -> requiresRole Roles.gmailInsert >=> genericGmailJsonHandler stream
-                    | Imap _ -> requiresRole Roles.imapAppend >=> genericImapJsonHandler stream
+                match config.Inbox with
+                | Gmail _ -> requiresRole Roles.gmailInsert >=> genericGmailJsonHandler stream
+                | Imap _ -> requiresRole Roles.imapAppend >=> genericImapJsonHandler stream
 
             return! handler next ctx
         }
 
 let private genericJsonHandlerWithTemplateMap (defaultTemplate: string) (map: Map<string, string>) : HttpHandler =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
+    hasContentType
+        "application/json"
+        { InvalidHeaderValue = None
+          HeaderNotFound = None }
+    >=> fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let! json = ctx.BindJsonAsync<JsonElement>()
 

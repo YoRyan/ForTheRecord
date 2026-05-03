@@ -5,84 +5,15 @@ open System.Collections.Generic
 open System.IO
 open System.Net
 open System.Net.Http
-open System.Net.Http.Headers
 open System.Text
 
-open Giraffe
-open Meziantou.Framework.Http
-open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.TestHost
-open Microsoft.Extensions.Hosting
-open MimeKit
 open MimeKit.Text
 open Xunit
 
 open ForTheRecord.Config
 open ForTheRecord.Gmail
-open ForTheRecord.Http
 
-open Mocks
-
-let private getTestApp (config: ServeConfig) =
-    let builder = WebApplication.CreateBuilder()
-    builder.WebHost.UseTestServer() |> ignore
-    configureServices config builder.Services
-
-    let app = builder.Build()
-    app.UseGiraffe webApp
-    app.Start()
-    app
-
-let private testRequest (config: ServeConfig) (request: HttpRequestMessage) =
-    let resp =
-        task {
-            use server = getTestApp(config).GetTestServer()
-            use client = server.CreateClient()
-            let! response = request |> client.SendAsync
-            return response
-        }
-
-    resp.Result
-
-let private mockWithoutAuth () =
-    let mock = MockGmailInbox()
-
-    let config =
-        { Htpasswd = None
-          HttpUrls = None
-          AppriseTemplates = Map.empty
-          Inbox = Gmail(Set.empty, Set.empty, mock) }
-
-    config, mock
-
-let private mockWithHunter2Auth (user: string) (hasInsert: bool) (hasSend: bool) =
-    let mock = MockGmailInbox()
-
-    let authSet yay =
-        if yay then Set(Seq.singleton user) else Set.empty
-
-    let config =
-        { Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
-          HttpUrls = None
-          AppriseTemplates = Map.empty
-          Inbox = Gmail(authSet hasInsert, authSet hasSend, mock) }
-
-    config, mock
-
-let private makeBasicAuth (user: string) (pass: string) =
-    AuthenticationHeaderValue("Basic", $"{user}:{pass}" |> Encoding.UTF8.GetBytes |> Convert.ToBase64String)
-
-let private makeContent (mime: string) (s: string) =
-    let content = new ByteArrayContent(Encoding.UTF8.GetBytes s)
-    content.Headers.ContentType <- Headers.MediaTypeHeaderValue mime
-    content
-
-let private makeTextContent = makeContent "text/plain"
-
-let private readEntity (e: MimeEntity) =
-    use stream = new MemoryStream()
-    e.WriteTo stream
-    stream.ToArray()
+open Fixtures
 
 [<Fact>]
 let ``Endpoints not available when Gmail is not configured`` () =
@@ -108,7 +39,7 @@ let ``Endpoints not available when Gmail is not configured`` () =
 
 [<Fact>]
 let ``Authenticated endpoints work when authentication is disabled`` () =
-    let config, _ = mockWithoutAuth ()
+    let config, _ = mockGmailWithoutAuth ()
 
     let request =
         new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/ez")
@@ -124,7 +55,7 @@ let ``Authenticated endpoints work when authentication is disabled`` () =
 
 [<Fact>]
 let ``Authenticated endpoints require authentication`` () =
-    let config, _ = mockWithHunter2Auth "AzureDiamond" true true
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true true
 
     let request =
         new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/ez")
@@ -140,7 +71,7 @@ let ``Authenticated endpoints require authentication`` () =
 
 [<Fact>]
 let ``Authenticated endpoints work with basic authentication`` () =
-    let config, _ = mockWithHunter2Auth "AzureDiamond" true true
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true true
     let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
 
     let request =
@@ -159,7 +90,7 @@ let ``Authenticated endpoints work with basic authentication`` () =
 
 [<Fact>]
 let ``Authenticated endpoints fail with bad authentication`` () =
-    let config, _ = mockWithHunter2Auth "AzureDiamond" true true
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true true
     let authHeader = makeBasicAuth "AzureDiamond" "whatever"
 
     let request =
@@ -177,8 +108,8 @@ let ``Authenticated endpoints fail with bad authentication`` () =
     Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode)
 
 [<Fact>]
-let ``Authenticated import endpoints require the import scope`` () =
-    let config, _ = mockWithHunter2Auth "AzureDiamond" false true
+let ``Authenticated import endpoints require the insert scope`` () =
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" false true
     let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
 
     let request =
@@ -197,7 +128,7 @@ let ``Authenticated import endpoints require the import scope`` () =
 
 [<Fact>]
 let ``Minimal import call produces a valid message`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     let request =
         new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/ez")
@@ -210,7 +141,7 @@ let ``Minimal import call produces a valid message`` () =
 
 [<Fact>]
 let ``Easy curl import works`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     use content =
         makeTextContent
@@ -235,7 +166,7 @@ let ``Easy curl import works`` () =
 
 [<Fact>]
 let ``Easy curl import passes through headers`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     let request =
         new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/ez")
@@ -252,7 +183,7 @@ let ``Easy curl import passes through headers`` () =
 
 [<Fact>]
 let ``Easy curl import passes through Content-Type`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     let request =
         new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/ez")
@@ -271,7 +202,7 @@ let ``Easy curl import passes through Content-Type`` () =
 
 [<Fact>]
 let ``Curl import with application/x-www-form-urlencoded works`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     use content =
         new FormUrlEncodedContent(
@@ -308,7 +239,7 @@ let ``Curl import with application/x-www-form-urlencoded works`` () =
 
 [<Fact>]
 let ``Curl import with application/x-www-form-urlencoded works with non-plain body`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     use content =
         new FormUrlEncodedContent(
@@ -330,7 +261,7 @@ let ``Curl import with application/x-www-form-urlencoded works with non-plain bo
 
 [<Fact>]
 let ``Curl import with multipart/form-data works`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     use content = new MultipartFormDataContent()
 
@@ -367,11 +298,12 @@ let ``Curl import with multipart/form-data works`` () =
 
 [<Fact>]
 let ``Curl import with multipart/form-data works with attachments`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     use content = new MultipartFormDataContent()
     content.Add(makeTextContent "Hello, World!", "body")
-    content.Add(makeContent "application/json" "{\"hello\": \"world\"}", "upload", "hello.json")
+    use jsonContent = makeJsonContent {| hello = "world" |}
+    content.Add(jsonContent, "upload", "hello.json")
     content.Add(makeContent "text/html" "<p>hello <strong>world</strong></p>", "upload2", "hello.html")
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import")
@@ -391,7 +323,12 @@ let ``Curl import with multipart/form-data works with attachments`` () =
     Assert.Equal("hello.html", attachments[1].ContentType.Name)
 
     Assert.Contains(
-        "{\"hello\": \"world\"}" |> Encoding.UTF8.GetBytes |> Convert.ToBase64String,
+        jsonContent
+        |> _.ReadAsStringAsync()
+        |> Async.AwaitTask
+        |> Async.RunSynchronously
+        |> Encoding.UTF8.GetBytes
+        |> Convert.ToBase64String,
         attachments[0] |> readEntity |> Encoding.UTF8.GetString
     )
 
@@ -404,7 +341,7 @@ let ``Curl import with multipart/form-data works with attachments`` () =
 
 [<Fact>]
 let ``Curl import with multipart/form-data works (sort of) with non-plain body`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     use content = new MultipartFormDataContent()
     content.Add(makeContent "text/html" "Hello, <em>World!</em>", "body")
@@ -424,7 +361,7 @@ let ``Curl import with multipart/form-data works (sort of) with non-plain body``
 
 [<Fact>]
 let ``Curl import passes through headers`` () =
-    let config, mock = mockWithoutAuth ()
+    let config, mock = mockGmailWithoutAuth ()
 
     use content = new MultipartFormDataContent()
     content.Add(makeTextContent "Hello, World!", "body")
@@ -443,7 +380,7 @@ let ``Curl import passes through headers`` () =
 
 [<Fact>]
 let ``Whole message import works`` () =
-    let _, mock = mockWithoutAuth ()
+    let _, mock = mockGmailWithoutAuth ()
 
     let message =
         """From: me
@@ -472,7 +409,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 
 [<Fact>]
 let ``Whole message import works with labels`` () =
-    let _, mock = mockWithoutAuth ()
+    let _, mock = mockGmailWithoutAuth ()
 
     let message =
         """From: me
@@ -510,7 +447,7 @@ This is the label test message.
 
 [<Fact>]
 let ``Whole message import works with flags`` () =
-    let _, mock = mockWithoutAuth ()
+    let _, mock = mockGmailWithoutAuth ()
 
     let message =
         """From: me
