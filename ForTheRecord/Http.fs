@@ -265,7 +265,7 @@ let private genericJsonHandler (template: string) (json: JsonElement) : HttpHand
             return! handler next ctx
         }
 
-let private genericJsonHandlerWithTemplateMap (defaultTemplate: string) (map: Map<string, string>) : HttpHandler =
+let private genericJsonHandlerWithTemplateMap (defaultTemplateName: string) (map: Map<string, string>) : HttpHandler =
     hasContentType
         "application/json"
         { InvalidHeaderValue = None
@@ -274,12 +274,14 @@ let private genericJsonHandlerWithTemplateMap (defaultTemplate: string) (map: Ma
         task {
             let! json = ctx.BindJsonAsync<JsonElement>()
 
-            let template =
+            let! template =
                 tryJsonProperty "ftr_template" json
                 |> Option.map _.ToString()
                 |> Option.map map.TryGetValue
                 |> Option.bind tryGetByref
-                |> Option.defaultValue defaultTemplate
+                |> function
+                    | Some t -> Task.FromResult t
+                    | None -> readEmbeddedText defaultTemplateName
 
             return! genericJsonHandler template json next ctx
         }
@@ -288,41 +290,7 @@ let private appriseHandler: HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         let config = ctx.GetService<ServeConfig>()
 
-        genericJsonHandlerWithTemplateMap
-            """To: me
-From: Apprise via ForTheRecord <me>
-{% if type == "failure" -%}
-X-FTR-Gmail-LabelID: INBOX
-X-FTR-Gmail-LabelID: STARRED
-{% endif -%}
-{% capture type %}{% case type -%}
-{% when "info" %}📢{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️
-{%- else %}[{{ type }}]{% endcase %}{% endcapture -%}
-{% capture subject %}{{ type }} {{ title }}{% endcapture -%}
-Subject: {{ subject | ftr_encode_utf8 }}
-Content-Type: multipart/mixed; boundary={{ ftr.guid }}
-
---{{ ftr.guid }}
-{% if ftr_forcefarmot %}{% assign ftr_forceformat = ftr_forcefarmot %}{% endif -%}
-{% if ftr_forceformat == "html" -%}
-Content-Type: text/html
-{% else -%}
-Content-Type: text/plain
-{% endif -%}
-
-{{ message }}
-{% for attach in attachments -%}
---{{ ftr.guid }}
-Content-Type: {{ attach.mimetype }}; name="{{ attach.filename | escape }}"
-Content-Transfer-Encoding: base64
-
-{{ attach.base64 }}
-{% endfor -%}
---{{ ftr.guid }}--
-"""
-            config.AppriseTemplates
-            next
-            ctx
+        genericJsonHandlerWithTemplateMap "Liquid.Apprise.liquid" config.AppriseTemplates next ctx
 
 let webApp =
     choose

@@ -1,5 +1,7 @@
 module ForTheRecord.Helpers
 
+open System.IO
+open System.Reflection
 open System.Text.Json
 
 /// Attempt a downcast without raising an exception if it fails.
@@ -22,3 +24,11 @@ let tryJsonProperty (name: string) (js: JsonElement) : JsonElement option =
     match js.ValueKind with
     | JsonValueKind.Object -> js.TryGetProperty name |> tryGetByref
     | _ -> None
+
+/// Read a text file embedded in the executing assembly.
+let readEmbeddedText (fileName: string) =
+    let assembly = Assembly.GetExecutingAssembly()
+    let name = $"{assembly.GetName().Name}.{fileName}"
+    use stream = assembly.GetManifestResourceStream name
+    use reader = new StreamReader(stream)
+    reader.ReadToEndAsync()
