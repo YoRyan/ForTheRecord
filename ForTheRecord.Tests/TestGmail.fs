@@ -316,7 +316,7 @@ let ``Curl import with multipart/form-data works with attachments`` () =
     Assert.Equal("Hello, World!", TextFormat.Plain |> called.Message.GetTextBody |> _.Trim())
 
     let attachments = mock.CalledImport.Value.Message.Attachments |> Seq.toList
-    Assert.Equal(attachments.Length, 2)
+    Assert.Equal(2, attachments.Length)
     Assert.Equal("application/json", attachments[0].ContentType.MimeType)
     Assert.Equal("hello.json", attachments[0].ContentType.Name)
     Assert.Equal("text/html", attachments[1].ContentType.MimeType)
