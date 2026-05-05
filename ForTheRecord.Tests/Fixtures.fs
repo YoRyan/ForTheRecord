@@ -20,17 +20,6 @@ open ForTheRecord.Gmail
 open ForTheRecord.Http
 open ForTheRecord.Imap
 
-type ApprisePayload =
-    { title: string
-      message: string
-      ``type``: string
-      attachments:
-          {| mimetype: string
-             filename: string
-             base64: string |} list
-      ftr_forcefarmot: string option
-      ftr_forceformat: string option }
-
 type MockGmailInbox() =
     member val CalledImport: {| Message: MimeMessage
                                 LabelIds: string list option

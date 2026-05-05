@@ -12,17 +12,26 @@ Subject: {{ subject | ftr_encode_utf8 }}
 Content-Type: multipart/mixed; boundary={{ ftr.guid }}
 
 --{{ ftr.guid }}
-{% if ftr_forcefarmot %}{% assign ftr_forceformat = ftr_forcefarmot %}{% endif -%}
-{% if ftr_forceformat == "html" -%}
+{% if ftr_forcefarmot %}{% assign format = ftr_forcefarmot %}{% endif -%}
+{% if ftr_forceformat %}{% assign format = ftr_forceformat %}{% endif -%}
+{% case format -%}
+{% when "html" -%}
 Content-Type: text/html
-{% else -%}
-Content-Type: text/plain
-{% endif -%}
 
 {{ message }}
+{% when "markdown" -%}
+Content-Type: text/html
+
+{{ message | ftr_markdown }}
+{% else -%}
+Content-Type: text/plain
+
+{{ message }}
+{% endcase -%}
 {% for attach in attachments -%}
 --{{ ftr.guid }}
 Content-Type: {{ attach.mimetype }}; name="{{ attach.filename | escape }}"
+Content-Disposition: attachment; filename="{{ attach.filename | escape }}"
 Content-Transfer-Encoding: base64
 
 {{ attach.base64 }}

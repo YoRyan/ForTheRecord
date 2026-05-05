@@ -7,6 +7,7 @@ open System.Threading.Tasks
 
 open Fluid
 open Fluid.Values
+open Markdig
 
 type Filters() =
     /// Encodes an UTF-8 string inline so that it is safe for use in email
@@ -21,11 +22,24 @@ type Filters() =
         |> fun sv -> sv :> FluidValue
         |> ValueTask.FromResult
 
+    /// Converts Markdown to HTML.
+    static member markdown (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
+        input
+        |> _.ToStringValue()
+        |> Markdown.ToHtml
+        |> StringValue
+        |> fun sv -> sv :> FluidValue
+        |> ValueTask.FromResult
+
 /// Create a template options object with our custom filters configured.
 let createTemplateOptions () =
     let options = TemplateOptions()
 
-    for name, d in seq { "ftr_encode_utf8", Filters.encodeUtf8 } do
+    for name, d in
+        seq {
+            "ftr_encode_utf8", Filters.encodeUtf8
+            "ftr_markdown", Filters.markdown
+        } do
         options.Filters.AddFilter(name, FilterDelegate d)
 
     options
