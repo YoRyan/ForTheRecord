@@ -61,6 +61,98 @@ let ``Endpoints require Gmail insert scope when Gmail is configured`` () =
     Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode)
 
 [<Fact>]
+let ``JSON import handles custom template with json key`` () =
+    let mock = MockGmailInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpUrls = None
+          AppriseTemplates =
+            Map(
+                seq {
+                    "test",
+                    """From: me
+To: me
+Subject: Test Subject
+
+{{ key1 }} {{ json.key2 }} {{ key3.value }} {{ json.key4.value }}
+"""
+                }
+            )
+          Inbox = Gmail(Set.empty, Set.empty, mock) }
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+
+    use content =
+        {| key1 = "one"
+           key2 = "two"
+           key3 = {| value = "three" |}
+           key4 = {| value = "four" |}
+           ftr_template = "test" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equal("Test Subject", called.Message.Subject)
+
+    let body =
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+
+    Assert.Contains("one two three four", body)
+
+[<Fact>]
+let ``JSON import handles custom template with reference to user`` () =
+    let config, mock = mockGmailWithHunter2Auth "AzureDiamond" true false
+
+    let config =
+        { Htpasswd = config.Htpasswd
+          HttpUrls = None
+          AppriseTemplates =
+            Map(
+                seq {
+                    "test",
+                    """From: me
+To: me
+Subject: Test Subject
+
+{{ ftr.user }} says "{{ message }}"
+"""
+                }
+            )
+          Inbox = config.Inbox }
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+    request.Headers.Authorization <- makeBasicAuth "AzureDiamond" "hunter2"
+
+    use content =
+        {| message = "Hello, World!"
+           ftr_template = "test" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equal("Test Subject", called.Message.Subject)
+
+    let body =
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+
+    Assert.Contains("AzureDiamond says \"Hello, World!\"", body)
+
+[<Fact>]
 let ``Apprise import works`` () =
     let config, mock = mockGmailWithoutAuth ()
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
