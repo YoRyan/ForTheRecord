@@ -9,21 +9,9 @@ open MimeKit
 open Xunit
 
 open ForTheRecord.Config
+open ForTheRecord.Gmail
 
 open Fixtures
-
-type ApprisePayload =
-    { title: string
-      message: string
-      ``type``: string
-      format: string
-      attachments:
-          {| mimetype: string
-             filename: string
-             base64: string |} list
-      ftr_template: string option
-      ftr_forcefarmot: string option
-      ftr_forceformat: string option }
 
 [<Fact>]
 let ``Endpoints require Json request content`` () =
@@ -45,14 +33,10 @@ let ``Endpoints require Gmail insert scope when Gmail is configured`` () =
     request.Headers.Authorization <- authHeader
 
     use content =
-        { title = "Title"
-          message = "Whatever"
-          ``type`` = "info"
-          format = "text"
-          attachments = []
-          ftr_template = None
-          ftr_forcefarmot = None
-          ftr_forceformat = None }
+        {| title = "Title"
+           message = "Whatever"
+           ``type`` = "info"
+           format = "text" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -67,7 +51,8 @@ let ``JSON import handles custom template with json key`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
-          AppriseTemplates =
+          AppriseTemplates = Map.empty
+          WebhookTemplates =
             Map(
                 seq {
                     "test",
@@ -81,7 +66,7 @@ Subject: Test Subject
             )
           Inbox = Gmail(Set.empty, Set.empty, mock) }
 
-    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
 
     use content =
         {| key1 = "one"
@@ -114,7 +99,8 @@ let ``JSON import handles custom template with reference to user`` () =
     let config =
         { Htpasswd = config.Htpasswd
           HttpUrls = None
-          AppriseTemplates =
+          AppriseTemplates = Map.empty
+          WebhookTemplates =
             Map(
                 seq {
                     "test",
@@ -128,7 +114,7 @@ Subject: Test Subject
             )
           Inbox = config.Inbox }
 
-    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
     request.Headers.Authorization <- makeBasicAuth "AzureDiamond" "hunter2"
 
     use content =
@@ -153,20 +139,120 @@ Subject: Test Subject
     Assert.Contains("AzureDiamond says \"Hello, World!\"", body)
 
 [<Fact>]
+let ``JSON import handles missing template`` () =
+    let mock = MockGmailInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpUrls = None
+          AppriseTemplates = Map.empty
+          WebhookTemplates = Map.empty
+          Inbox = Gmail(Set.empty, Set.empty, mock) }
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| message = "whatever"
+           ftr_template = "test" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.UnprocessableContent, response.StatusCode)
+
+[<Fact>]
+let ``Webhook import works`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| title = "Hello, World!"
+           message =
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua." |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Contains(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+    )
+
+    Assert.Equal("Hello, World!", called.Message.Subject)
+
+[<Fact>]
+let ``Webhook import works with alternate subject field`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| subject = "Hello, World!"
+           message =
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua." |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Contains(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+    )
+
+    Assert.Equal("Hello, World!", called.Message.Subject)
+
+[<Fact>]
+let ``Webhook import sets Gmail flags`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           gmail_internal_date_source = "dateheader"
+           gmail_never_mark_spam = "true"
+           gmail_process_for_calendar = "false"
+           gmail_deleted = "false" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equal(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
+    Assert.Equal(Some true, called.NeverMarkSpam)
+    Assert.Equal(Some false, called.ProcessForCalendar)
+    Assert.Equal(Some false, called.Deleted)
+
+[<Fact>]
 let ``Apprise import works`` () =
     let config, mock = mockGmailWithoutAuth ()
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
 
     use content =
-        { title = "Hello, World!"
-          message =
+        {| title = "Hello, World!"
+           message =
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-          ``type`` = "info"
-          format = "text"
-          attachments = []
-          ftr_template = None
-          ftr_forcefarmot = None
-          ftr_forceformat = None }
+           ``type`` = "info"
+           format = "text" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -192,14 +278,9 @@ let ``Apprise import handles 'text' input format`` () =
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
 
     use content =
-        { title = ""
-          message = "This is a plain text message."
-          ``type`` = "info"
-          format = "text"
-          attachments = []
-          ftr_template = None
-          ftr_forcefarmot = None
-          ftr_forceformat = None }
+        {| message = "This is a plain text message."
+           ``type`` = "info"
+           format = "text" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -216,14 +297,10 @@ let ``Apprise import handles 'html' input format`` () =
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
 
     use content =
-        { title = ""
-          message = "This is an <strong>HTML</strong> message."
-          ``type`` = "info"
-          format = "html"
-          attachments = []
-          ftr_template = None
-          ftr_forcefarmot = None
-          ftr_forceformat = None }
+        {| title = ""
+           message = "This is an <strong>HTML</strong> message."
+           ``type`` = "info"
+           format = "html" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -240,14 +317,10 @@ let ``Apprise import handles 'html' input format with the alternate field`` () =
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
 
     use content =
-        { title = ""
-          message = "This is an <strong>HTML</strong> message."
-          ``type`` = "info"
-          attachments = []
-          format = "text"
-          ftr_template = None
-          ftr_forcefarmot = None
-          ftr_forceformat = Some "html" }
+        {| message = "This is an <strong>HTML</strong> message."
+           ``type`` = "info"
+           format = "text"
+           ftr_forceformat = "html" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -264,14 +337,11 @@ let ``Apprise import handles 'html' input format with the second alternate field
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
 
     use content =
-        { title = ""
-          message = "This is an <strong>HTML</strong> message."
-          ``type`` = "info"
-          attachments = []
-          format = "text"
-          ftr_template = None
-          ftr_forcefarmot = Some "html"
-          ftr_forceformat = None }
+        {| title = ""
+           message = "This is an <strong>HTML</strong> message."
+           ``type`` = "info"
+           format = "text"
+           ftr_forcefarmot = "html" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -288,14 +358,11 @@ let ``Apprise import handles 'markdown' input format`` () =
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
 
     use content =
-        { title = ""
-          message = "This is a **markdown** message."
-          ``type`` = "info"
-          attachments = []
-          format = "markdown"
-          ftr_template = None
-          ftr_forcefarmot = None
-          ftr_forceformat = None }
+        {| title = ""
+           message = "This is a **markdown** message."
+           ``type`` = "info"
+           attachments = []
+           format = "markdown" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -321,20 +388,17 @@ let ``Apprise import handles attachments`` () =
         |> List.ofSeq
 
     use content =
-        { title = "Attachment Test Message"
-          message = "This is a message with attachments."
-          ``type`` = "info"
-          attachments =
+        {| title = "Attachment Test Message"
+           message = "This is a message with attachments."
+           ``type`` = "info"
+           attachments =
             List.map
                 (fun (filename, mimetype, base64) ->
                     {| filename = filename
                        mimetype = mimetype
                        base64 = base64 |})
                 data
-          format = "text"
-          ftr_template = None
-          ftr_forcefarmot = None
-          ftr_forceformat = None }
+           format = "text" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -383,20 +447,18 @@ This is a test using custom templates.
 """
                 }
             )
+          WebhookTemplates = Map.empty
           Inbox = Gmail(Set.empty, Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
 
     use content =
-        { title = "Hello, World!"
-          message =
+        {| title = "Hello, World!"
+           message =
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-          ``type`` = "info"
-          format = "text"
-          attachments = []
-          ftr_template = Some "test"
-          ftr_forcefarmot = None
-          ftr_forceformat = None }
+           ``type`` = "info"
+           format = "text"
+           ftr_template = "test" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -420,3 +482,31 @@ This is a test using custom templates.
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
         body
     )
+
+/// https://github.com/nikoksr/notify/tree/main/service/http
+[<Fact>]
+let ``Notify import works`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/go/notify")
+
+    use content =
+        {| subject = "Testing new features"
+           message = "Notify's HTTP service is here." |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Contains(
+        "Notify's HTTP service is here.",
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+    )
+
+    Assert.Equal("Testing new features", called.Message.Subject)

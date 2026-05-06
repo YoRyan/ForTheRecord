@@ -24,6 +24,7 @@ type ServeConfig =
     { Htpasswd: HtpasswdFile option
       HttpUrls: string list option
       AppriseTemplates: Map<string, string>
+      WebhookTemplates: Map<string, string>
       Inbox: ConfiguredInbox }
 
 let private inTable<'T> k (t: TomlTable) =
@@ -53,6 +54,12 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
               AppriseTemplates =
                 t
                 |> inTable "apprise"
+                |> Option.bind (inTable "templates")
+                |> Option.map asMap
+                |> Option.defaultValue Map.empty
+              WebhookTemplates =
+                t
+                |> inTable "webhook"
                 |> Option.bind (inTable "templates")
                 |> Option.map asMap
                 |> Option.defaultValue Map.empty

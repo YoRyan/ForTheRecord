@@ -10,6 +10,7 @@ open System.Threading.Tasks
 
 open Fluid
 open Giraffe
+open Giraffe.HttpStatusCodeHandlers.RequestErrors
 open idunno.Authentication.Basic
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
@@ -209,7 +210,13 @@ let private requiresRole role =
             next
             ctx
 
-let private genericGmailJsonHandler (message: Stream) =
+let private requiresJson =
+    hasContentType
+        "application/json"
+        { InvalidHeaderValue = None
+          HeaderNotFound = None }
+
+let private importWholeToGmail (message: Stream) =
     handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
@@ -217,10 +224,10 @@ let private genericGmailJsonHandler (message: Stream) =
             return Some ctx
         })
 
-let private genericImapJsonHandler (message: Stream) : HttpHandler =
-    fun (next: HttpFunc) (ctx: HttpContext) -> failwith "Not Implemented"
+let private importWholeToImap (message: Stream) =
+    handleContext (fun ctx -> failwith "Not Implemented")
 
-let private genericJsonHandler (template: string) (json: JsonElement) : HttpHandler =
+let private genericJsonTemplate (template: string) (model: obj) (importer: Stream -> HttpHandler) : HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let config = ctx.GetService<ServeConfig>()
@@ -230,8 +237,6 @@ let private genericJsonHandler (template: string) (json: JsonElement) : HttpHand
 
             if not ok then
                 failwithf "Failed to parse template: %s" error
-
-            let json = jsonLiquidModel json
 
             let ftr =
                 [ "user", authenticatedUser ctx |> Option.defaultValue null
@@ -243,11 +248,11 @@ let private genericJsonHandler (template: string) (json: JsonElement) : HttpHand
             let context =
                 TemplateContext(
                     seq<string * obj> {
-                        match tryDowncast<IDictionary<string, obj>> json with
+                        match tryDowncast<IDictionary<string, obj>> model with
                         | Some d -> yield! d |> Seq.map (|KeyValue|)
                         | None -> ()
 
-                        "json", json
+                        "json", model
                         "ftr", ftr
                     }
                     |> dict,
@@ -257,40 +262,66 @@ let private genericJsonHandler (template: string) (json: JsonElement) : HttpHand
             let! render = template.RenderAsync context
             use stream = new MemoryStream(Encoding.UTF8.GetBytes render)
 
-            let handler =
-                match config.Inbox with
-                | Gmail _ -> requiresRole Roles.gmailInsert >=> genericGmailJsonHandler stream
-                | Imap _ -> requiresRole Roles.imapAppend >=> genericImapJsonHandler stream
-
-            return! handler next ctx
+            return! importer stream next ctx
         }
 
-let private genericJsonHandlerWithTemplateMap (defaultTemplateName: string) (map: Map<string, string>) : HttpHandler =
-    hasContentType
-        "application/json"
-        { InvalidHeaderValue = None
-          HeaderNotFound = None }
-    >=> fun (next: HttpFunc) (ctx: HttpContext) ->
+let private genericJsonAuth
+    (defaultTemplateName: string)
+    (map: Map<string, string>)
+    (importer: Stream -> HttpHandler)
+    : HttpHandler =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let! json = ctx.BindJsonAsync<JsonElement>()
 
             let! template =
-                tryJsonProperty "ftr_template" json
-                |> Option.map _.ToString()
-                |> Option.map map.TryGetValue
-                |> Option.bind tryGetByref
+                json
+                |> tryJsonProperty "ftr_template"
                 |> function
-                    | Some t -> Task.FromResult t
-                    | None -> readEmbeddedText defaultTemplateName
+                    | Some prop ->
+                        match prop |> _.ToString() |> map.TryGetValue with
+                        | false, _ -> None
+                        | true, t -> Some t
+                        |> Task.FromResult
+                    | None ->
+                        task {
+                            let! t = readEmbeddedText defaultTemplateName
+                            return Some t
+                        }
 
-            return! genericJsonHandler template json next ctx
+            let handler =
+                match template with
+                | Some t -> genericJsonTemplate t (jsonLiquidModel json) importer
+                | None -> text "Unknown template specified" |> unprocessableEntity
+
+            return! handler next ctx
         }
+
+let private genericJson (defaultTemplateName: string) (map: Map<string, string>) : HttpHandler =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        let config = ctx.GetService<ServeConfig>()
+
+        let role, importer =
+            match config.Inbox with
+            | Gmail _ -> Roles.gmailInsert, importWholeToGmail
+            | Imap _ -> Roles.imapAppend, importWholeToImap
+
+        let handler =
+            requiresRole role
+            >=> requiresJson
+            >=> genericJsonAuth defaultTemplateName map importer
+
+        handler next ctx
+
+let private webhookHandler: HttpHandler =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        let config = ctx.GetService<ServeConfig>()
+        genericJson "Liquid.Webhook.liquid" config.WebhookTemplates next ctx
 
 let private appriseHandler: HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         let config = ctx.GetService<ServeConfig>()
-
-        genericJsonHandlerWithTemplateMap "Liquid.Apprise.liquid" config.AppriseTemplates next ctx
+        genericJson "Liquid.Apprise.liquid" config.AppriseTemplates next ctx
 
 let webApp =
     choose
@@ -304,6 +335,8 @@ let webApp =
                     >=> requiresRole Roles.gmailInsert
                     >=> requiresGmail
                     >=> importHandler
+                    route "/api/webhook" >=> webhookHandler
+                    route "/go/notify" >=> webhookHandler
                     route "/apprise" >=> appriseHandler ]
           RequestErrors.NOT_FOUND "404" ]
 

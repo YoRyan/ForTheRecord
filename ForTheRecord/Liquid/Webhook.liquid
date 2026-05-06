@@ -1,0 +1,22 @@
+To: me
+From: Apprise via ForTheRecord <me>
+{% for label in gmail_label_ids -%}
+X-FTR-Gmail-LabelID: {{ label }}
+{% endfor -%}
+{% if gmail_internal_date_source -%}
+X-FTR-Gmail-InternalDateSource: {{ gmail_internal_date_source }}
+{% endif -%}
+{% if gmail_never_mark_spam -%}
+X-FTR-Gmail-NeverMarkSpam: {{ gmail_never_mark_spam }}
+{% endif -%}
+{% if gmail_process_for_calendar -%}
+X-FTR-Gmail-ProcessForCalendar: {{ gmail_process_for_calendar }}
+{% endif -%}
+{% if gmail_deleted -%}
+X-FTR-Gmail-Deleted: {{ gmail_deleted }}
+{% endif -%}
+{% if subject %}{% assign title = subject %}{% endif -%}
+Subject: {{ title | ftr_encode_utf8 }}
+Content-Type: text/plain
+
+{{ message }}
