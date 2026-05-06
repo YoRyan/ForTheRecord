@@ -246,3 +246,48 @@ let ``Shoutrrr JSON import sets Gmail important label`` () =
         |> Set.ofSeq,
         called.LabelIds.Value
     )
+
+[<Fact>]
+let ``Shoutrrr JSON import handles custom template`` () =
+    let mock = MockGmailInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpUrls = None
+          Templates =
+            Map(
+                seq {
+                    "test",
+                    """From: me
+To: me
+Subject: Test Subject
+
+Here's my message! {{ message }}
+"""
+                }
+            )
+          Inbox = Gmail(Set.empty, Set.empty, mock) }
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr/json")
+
+    use content =
+        {| title = "Amazing opportunities!"
+           message = "New map book available for purchase."
+           ftr_template = "test" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equal("Test Subject", called.Message.Subject)
+
+    let body =
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+
+    Assert.Contains("Here's my message! New map book available for purchase.", body)
