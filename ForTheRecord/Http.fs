@@ -310,12 +310,12 @@ let private genericJson (defaultTemplateName: string) (map: Map<string, string>)
     >=> requiresJson
     >=> genericJsonFindTemplate defaultTemplateName map
 
-let private webhookHandler: HttpHandler =
+let private webhookHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         let config = ctx.GetService<ServeConfig>()
         genericJson "Liquid.Webhook.liquid" config.WebhookTemplates next ctx
 
-let private appriseHandler: HttpHandler =
+let private appriseHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         let config = ctx.GetService<ServeConfig>()
         genericJson "Liquid.Apprise.liquid" config.AppriseTemplates next ctx
