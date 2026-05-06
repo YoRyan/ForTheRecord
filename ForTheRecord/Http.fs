@@ -227,20 +227,8 @@ let private requiresJson =
         { InvalidHeaderValue = None
           HeaderNotFound = None }
 
-let private importWholeMessage (message: Stream) =
+let private importWholeMessage (template: string) (modelKey: string) (model: obj) =
     handleContext (fun ctx ->
-        let config = ctx.GetService<ServeConfig>()
-
-        task {
-            match config.Inbox with
-            | Gmail(_, _, inbox) -> do! importWholeMessageToGmail inbox message
-            | Imap(_, inbox) -> failwith "Not Implemented"
-
-            return Some ctx
-        })
-
-let private genericJsonRenderTemplate (template: string) (model: obj) =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let config = ctx.GetService<ServeConfig>()
             let parser = ctx.GetService<FluidParser>()
@@ -264,7 +252,9 @@ let private genericJsonRenderTemplate (template: string) (model: obj) =
                         | Some d -> yield! d |> Seq.map (|KeyValue|)
                         | None -> ()
 
-                        "json", model
+                        if modelKey <> "" then
+                            modelKey, model
+
                         "ftr", ftr
                     }
                     |> dict,
@@ -274,8 +264,13 @@ let private genericJsonRenderTemplate (template: string) (model: obj) =
             let! render = template.RenderAsync context
             use stream = new MemoryStream(Encoding.UTF8.GetBytes render)
 
-            return! importWholeMessage stream next ctx
-        }
+            do!
+                match config.Inbox with
+                | Gmail(_, _, inbox) -> importWholeMessageToGmail inbox stream
+                | Imap(_, inbox) -> failwith "Not Implemented"
+
+            return Some ctx
+        })
 
 let private genericJsonFindTemplate (defaultTemplateName: string) (map: Map<string, string>) =
     fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -299,7 +294,7 @@ let private genericJsonFindTemplate (defaultTemplateName: string) (map: Map<stri
 
             let handler =
                 match template with
-                | Some t -> json |> jsonLiquidModel |> genericJsonRenderTemplate t
+                | Some t -> json |> jsonLiquidModel |> importWholeMessage t "json"
                 | None -> text "Unknown template specified" |> unprocessableEntity
 
             return! handler next ctx
@@ -320,6 +315,38 @@ let private appriseHandler =
         let config = ctx.GetService<ServeConfig>()
         genericJson "Liquid.Apprise.liquid" config.AppriseTemplates next ctx
 
+let private shoutrrrHandler =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        task {
+            let config = ctx.GetService<ServeConfig>()
+
+            let! template =
+                ctx.Request.Query.TryGetValue "ftr_template"
+                |> tryGetByref
+                |> function
+                    | Some sv ->
+                        match sv |> Seq.last |> config.ShoutrrrTemplates.TryGetValue with
+                        | false, _ -> None
+                        | true, t -> Some t
+                        |> Task.FromResult
+                    | None ->
+                        task {
+                            let! t = readEmbeddedText "Liquid.Shoutrrr.liquid"
+                            return Some t
+                        }
+
+            let! body = ctx.ReadBodyFromRequestAsync()
+
+            let handler =
+                match template with
+                | Some t ->
+                    let model = seq<string * obj> { "message", body } |> dict
+                    importWholeMessage t "" model
+                | None -> text "Unknown template specified" |> unprocessableEntity
+
+            return! handler next ctx
+        }
+
 let webApp =
     choose
         [ POST
@@ -334,7 +361,9 @@ let webApp =
                     >=> importHandler
                     route "/api/webhook" >=> webhookHandler
                     route "/go/notify" >=> webhookHandler
-                    route "/apprise" >=> appriseHandler ]
+                    route "/apprise" >=> appriseHandler
+                    route "/shoutrrr" >=> requiresImportRole >=> shoutrrrHandler
+                    route "/shoutrrr/json" >=> webhookHandler ]
           RequestErrors.NOT_FOUND "404" ]
 
 let private validateCredentials (context: ValidateCredentialsContext) =

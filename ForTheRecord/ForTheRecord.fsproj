@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Liquid\Apprise.liquid" />
+    <EmbeddedResource Include="Liquid\Shoutrrr.liquid" />
     <EmbeddedResource Include="Liquid\Webhook.liquid" />
   </ItemGroup>
 

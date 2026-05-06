@@ -23,6 +23,7 @@ let ``Endpoints not available when Gmail is not configured`` () =
         { Htpasswd = None
           HttpUrls = None
           AppriseTemplates = Map.empty
+          ShoutrrrTemplates = Map.empty
           WebhookTemplates = Map.empty
           Inbox = Imap(Set.empty, mock) }
 
