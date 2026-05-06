@@ -210,24 +210,36 @@ let private requiresRole role =
             next
             ctx
 
+let private requiresImportRole =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        let config = ctx.GetService<ServeConfig>()
+
+        requiresRole
+            (match config.Inbox with
+             | Gmail _ -> Roles.gmailInsert
+             | Imap _ -> Roles.imapAppend)
+            next
+            ctx
+
 let private requiresJson =
     hasContentType
         "application/json"
         { InvalidHeaderValue = None
           HeaderNotFound = None }
 
-let private importWholeToGmail (message: Stream) =
+let private importWholeMessage (message: Stream) =
     handleContext (fun ctx ->
+        let config = ctx.GetService<ServeConfig>()
+
         task {
-            let config = ctx.GetService<ServeConfig>()
-            do! importWholeMessageToGmail (getGmailInbox config) message
+            match config.Inbox with
+            | Gmail(_, _, inbox) -> do! importWholeMessageToGmail inbox message
+            | Imap(_, inbox) -> failwith "Not Implemented"
+
             return Some ctx
         })
 
-let private importWholeToImap (message: Stream) =
-    handleContext (fun ctx -> failwith "Not Implemented")
-
-let private genericJsonTemplate (template: string) (model: obj) (importer: Stream -> HttpHandler) : HttpHandler =
+let private genericJsonRenderTemplate (template: string) (model: obj) =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let config = ctx.GetService<ServeConfig>()
@@ -262,14 +274,10 @@ let private genericJsonTemplate (template: string) (model: obj) (importer: Strea
             let! render = template.RenderAsync context
             use stream = new MemoryStream(Encoding.UTF8.GetBytes render)
 
-            return! importer stream next ctx
+            return! importWholeMessage stream next ctx
         }
 
-let private genericJsonAuth
-    (defaultTemplateName: string)
-    (map: Map<string, string>)
-    (importer: Stream -> HttpHandler)
-    : HttpHandler =
+let private genericJsonFindTemplate (defaultTemplateName: string) (map: Map<string, string>) =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let! json = ctx.BindJsonAsync<JsonElement>()
@@ -291,27 +299,16 @@ let private genericJsonAuth
 
             let handler =
                 match template with
-                | Some t -> genericJsonTemplate t (jsonLiquidModel json) importer
+                | Some t -> json |> jsonLiquidModel |> genericJsonRenderTemplate t
                 | None -> text "Unknown template specified" |> unprocessableEntity
 
             return! handler next ctx
         }
 
-let private genericJson (defaultTemplateName: string) (map: Map<string, string>) : HttpHandler =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
-        let config = ctx.GetService<ServeConfig>()
-
-        let role, importer =
-            match config.Inbox with
-            | Gmail _ -> Roles.gmailInsert, importWholeToGmail
-            | Imap _ -> Roles.imapAppend, importWholeToImap
-
-        let handler =
-            requiresRole role
-            >=> requiresJson
-            >=> genericJsonAuth defaultTemplateName map importer
-
-        handler next ctx
+let private genericJson (defaultTemplateName: string) (map: Map<string, string>) =
+    requiresImportRole
+    >=> requiresJson
+    >=> genericJsonFindTemplate defaultTemplateName map
 
 let private webhookHandler: HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
