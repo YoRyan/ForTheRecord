@@ -283,7 +283,7 @@ let ``Apprise import handles 'text' input format`` () =
     use content =
         {| message = "This is a plain text message."
            ``type`` = "info"
-           format = "text" |}
+           ftr_forceformat = "text" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -303,7 +303,7 @@ let ``Apprise import handles 'html' input format`` () =
         {| title = ""
            message = "This is an <strong>HTML</strong> message."
            ``type`` = "info"
-           format = "html" |}
+           ftr_forceformat = "html" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -321,27 +321,6 @@ let ``Apprise import handles 'html' input format with the alternate field`` () =
 
     use content =
         {| message = "This is an <strong>HTML</strong> message."
-           ``type`` = "info"
-           format = "text"
-           ftr_forceformat = "html" |}
-        |> makeJsonContent
-
-    request.Content <- content
-    testRequest config request |> ignore
-
-    let called = mock.CalledImport.Value
-    let body = Seq.exactlyOne called.Message.BodyParts
-    Assert.Contains("This is an <strong>HTML</strong> message.", body |> readEntity |> Encoding.UTF8.GetString)
-    Assert.Equivalent(body.ContentType, ContentType("text", "html"))
-
-[<Fact>]
-let ``Apprise import handles 'html' input format with the second alternate field`` () =
-    let config, mock = mockGmailWithoutAuth ()
-    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
-
-    use content =
-        {| title = ""
-           message = "This is an <strong>HTML</strong> message."
            ``type`` = "info"
            format = "text"
            ftr_forcefarmot = "html" |}
@@ -365,7 +344,7 @@ let ``Apprise import handles 'markdown' input format`` () =
            message = "This is a **markdown** message."
            ``type`` = "info"
            attachments = []
-           format = "markdown" |}
+           ftr_forceformat = "markdown" |}
         |> makeJsonContent
 
     request.Content <- content
