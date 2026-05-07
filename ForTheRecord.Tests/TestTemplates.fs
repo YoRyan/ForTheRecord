@@ -51,9 +51,7 @@ let ``JSON import handles custom template with json key`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
-          AppriseTemplates = Map.empty
-          ShoutrrrTemplates = Map.empty
-          WebhookTemplates =
+          Templates =
             Map(
                 seq {
                     "test",
@@ -100,9 +98,7 @@ let ``JSON import handles custom template with reference to user`` () =
     let config =
         { Htpasswd = config.Htpasswd
           HttpUrls = None
-          AppriseTemplates = Map.empty
-          ShoutrrrTemplates = Map.empty
-          WebhookTemplates =
+          Templates =
             Map(
                 seq {
                     "test",
@@ -147,9 +143,7 @@ let ``JSON import handles missing template`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
-          AppriseTemplates = Map.empty
-          WebhookTemplates = Map.empty
-          ShoutrrrTemplates = Map.empty
+          Templates = Map.empty
           Inbox = Gmail(Set.empty, Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
@@ -415,7 +409,7 @@ let ``Apprise import handles custom template`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
-          AppriseTemplates =
+          Templates =
             Map(
                 seq {
                     "test",
@@ -429,8 +423,6 @@ This is a test using custom templates.
 """
                 }
             )
-          ShoutrrrTemplates = Map.empty
-          WebhookTemplates = Map.empty
           Inbox = Gmail(Set.empty, Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
@@ -527,8 +519,7 @@ let ``Shoutrrr import handles custom template`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
-          AppriseTemplates = Map.empty
-          ShoutrrrTemplates =
+          Templates =
             Map(
                 seq {
                     "test",
@@ -540,7 +531,6 @@ Here's my message! {{ message }}
 """
                 }
             )
-          WebhookTemplates = Map.empty
           Inbox = Gmail(Set.empty, Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr?ftr_template=test")
@@ -569,8 +559,7 @@ let ``Shoutrrr import handles custom template with reference to user`` () =
     let config =
         { Htpasswd = config.Htpasswd
           HttpUrls = None
-          AppriseTemplates = Map.empty
-          ShoutrrrTemplates =
+          Templates =
             Map(
                 seq {
                     "test",
@@ -582,7 +571,6 @@ Subject: Test Subject
 """
                 }
             )
-          WebhookTemplates = Map.empty
           Inbox = config.Inbox }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr?ftr_template=test")

@@ -23,9 +23,7 @@ type ConfiguredInbox =
 type ServeConfig =
     { Htpasswd: HtpasswdFile option
       HttpUrls: string list option
-      AppriseTemplates: Map<string, string>
-      ShoutrrrTemplates: Map<string, string>
-      WebhookTemplates: Map<string, string>
+      Templates: Map<string, string>
       Inbox: ConfiguredInbox }
 
 let private inTable<'T> k (t: TomlTable) =
@@ -52,24 +50,7 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
                 |> Option.bind (inTable<string> "htpasswd")
                 |> Option.map HtpasswdFile.Parse
               HttpUrls = t |> inTable "http" |> Option.bind (inTable "urls") |> Option.map asList
-              AppriseTemplates =
-                t
-                |> inTable "apprise"
-                |> Option.bind (inTable "templates")
-                |> Option.map asMap
-                |> Option.defaultValue Map.empty
-              ShoutrrrTemplates =
-                t
-                |> inTable "shoutrrr"
-                |> Option.bind (inTable "templates")
-                |> Option.map asMap
-                |> Option.defaultValue Map.empty
-              WebhookTemplates =
-                t
-                |> inTable "webhook"
-                |> Option.bind (inTable "templates")
-                |> Option.map asMap
-                |> Option.defaultValue Map.empty
+              Templates = t |> inTable "templates" |> Option.map asMap |> Option.defaultValue Map.empty
               Inbox = inbox }
     }
 

@@ -83,9 +83,7 @@ let mockGmailWithoutAuth () =
     let config =
         { Htpasswd = None
           HttpUrls = None
-          AppriseTemplates = Map.empty
-          ShoutrrrTemplates = Map.empty
-          WebhookTemplates = Map.empty
+          Templates = Map.empty
           Inbox = Gmail(Set.empty, Set.empty, mock) }
 
     config, mock
@@ -99,9 +97,7 @@ let mockGmailWithHunter2Auth (user: string) (hasInsert: bool) (hasSend: bool) =
     let config =
         { Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
           HttpUrls = None
-          AppriseTemplates = Map.empty
-          ShoutrrrTemplates = Map.empty
-          WebhookTemplates = Map.empty
+          Templates = Map.empty
           Inbox = Gmail(authSet hasInsert, authSet hasSend, mock) }
 
     config, mock

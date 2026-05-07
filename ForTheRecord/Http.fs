@@ -272,9 +272,10 @@ let private importWholeMessage (template: string) (modelKey: string) (model: obj
             return Some ctx
         })
 
-let private genericJsonFindTemplate (defaultTemplateName: string) (map: Map<string, string>) =
+let private genericJsonFindTemplate (defaultTemplateName: string) =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
+            let config = ctx.GetService<ServeConfig>()
             let! json = ctx.BindJsonAsync<JsonElement>()
 
             let! template =
@@ -282,7 +283,7 @@ let private genericJsonFindTemplate (defaultTemplateName: string) (map: Map<stri
                 |> tryJsonProperty "ftr_template"
                 |> function
                     | Some prop ->
-                        match prop |> _.ToString() |> map.TryGetValue with
+                        match prop |> _.ToString() |> config.Templates.TryGetValue with
                         | false, _ -> None
                         | true, t -> Some t
                         |> Task.FromResult
@@ -300,20 +301,14 @@ let private genericJsonFindTemplate (defaultTemplateName: string) (map: Map<stri
             return! handler next ctx
         }
 
-let private genericJson (defaultTemplateName: string) (map: Map<string, string>) =
+let private genericJson (defaultTemplateName: string) =
     requiresImportRole
     >=> requiresJson
-    >=> genericJsonFindTemplate defaultTemplateName map
+    >=> genericJsonFindTemplate defaultTemplateName
 
-let private webhookHandler =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
-        let config = ctx.GetService<ServeConfig>()
-        genericJson "Liquid.Webhook.liquid" config.WebhookTemplates next ctx
+let private webhookHandler = genericJson "Liquid.Webhook.liquid"
 
-let private appriseHandler =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
-        let config = ctx.GetService<ServeConfig>()
-        genericJson "Liquid.Apprise.liquid" config.AppriseTemplates next ctx
+let private appriseHandler = genericJson "Liquid.Apprise.liquid"
 
 let private shoutrrrHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -325,7 +320,7 @@ let private shoutrrrHandler =
                 |> tryGetByref
                 |> function
                     | Some sv ->
-                        match sv |> Seq.last |> config.ShoutrrrTemplates.TryGetValue with
+                        match sv |> Seq.last |> config.Templates.TryGetValue with
                         | false, _ -> None
                         | true, t -> Some t
                         |> Task.FromResult
