@@ -240,6 +240,80 @@ let ``Webhook import sets Gmail flags`` () =
     Assert.Equal(Some false, called.Deleted)
 
 [<Fact>]
+let ``Webhook import sets Gmail label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           gmail_label_id = "Label_SomeID" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equivalent(seq { "Label_SomeID" } |> Set.ofSeq, called.LabelIds.Value)
+
+[<Fact>]
+let ``Webhook import sets Gmail starred label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           gmail_starred = "true" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equivalent(
+        seq {
+            "INBOX"
+            "STARRED"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )
+
+[<Fact>]
+let ``Webhook import sets Gmail important label and custom label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           gmail_label_id = "Label_SomeID"
+           gmail_important = "true" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equivalent(
+        seq {
+            "Label_SomeID"
+            "IMPORTANT"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )
+
+[<Fact>]
 let ``Apprise import works`` () =
     let config, mock = mockGmailWithoutAuth ()
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
@@ -443,7 +517,7 @@ This is a test using custom templates.
 
     let called = mock.CalledImport.Value
     Assert.Equal("My Awesome Subject: Hello, World!", called.Message.Subject)
-    Assert.Equivalent([ "MyLabel" ], called.LabelIds.Value)
+    Assert.Equivalent(seq { "MyLabel" } |> Set.ofSeq, called.LabelIds.Value)
 
     let body =
         called.Message.BodyParts
@@ -456,6 +530,109 @@ This is a test using custom templates.
     Assert.Contains(
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
         body
+    )
+
+[<Fact>]
+let ``Apprise import sets Gmail flags`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           ``type`` = "info"
+           gmail_internal_date_source = "dateheader"
+           gmail_never_mark_spam = "true"
+           gmail_process_for_calendar = "false"
+           gmail_deleted = "false" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equal(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
+    Assert.Equal(Some true, called.NeverMarkSpam)
+    Assert.Equal(Some false, called.ProcessForCalendar)
+    Assert.Equal(Some false, called.Deleted)
+
+[<Fact>]
+let ``Apprise import sets Gmail label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           ``type`` = "info"
+           gmail_label_id = "Label_SomeID" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equivalent(seq { "Label_SomeID" } |> Set.ofSeq, called.LabelIds.Value)
+
+[<Fact>]
+let ``Apprise import sets Gmail starred label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           ``type`` = "info"
+           gmail_starred = "true" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equivalent(
+        seq {
+            "INBOX"
+            "STARRED"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )
+
+[<Fact>]
+let ``Apprise import sets Gmail important label and custom label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           ``type`` = "info"
+           gmail_label_id = "Label_SomeID"
+           gmail_important = "true" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equivalent(
+        seq {
+            "Label_SomeID"
+            "IMPORTANT"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
     )
 
 /// https://github.com/nikoksr/notify/tree/main/service/http
@@ -620,3 +797,104 @@ let ``Shoutrrr JSON import works`` () =
     )
 
     Assert.Equal("Amazing opportunities!", called.Message.Subject)
+
+[<Fact>]
+let ``Shoutrrr JSON import sets Gmail flags`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr/json")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           gmail_internal_date_source = "dateheader"
+           gmail_never_mark_spam = "true"
+           gmail_process_for_calendar = "false"
+           gmail_deleted = "false" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equal(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
+    Assert.Equal(Some true, called.NeverMarkSpam)
+    Assert.Equal(Some false, called.ProcessForCalendar)
+    Assert.Equal(Some false, called.Deleted)
+
+[<Fact>]
+let ``Shoutrrr JSON import sets Gmail label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr/json")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           gmail_label_id = "Label_SomeID" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equivalent(seq { "Label_SomeID" } |> Set.ofSeq, called.LabelIds.Value)
+
+[<Fact>]
+let ``Shoutrrr JSON import sets Gmail starred label and custom label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr/json")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           ``type`` = "info"
+           gmail_label_id = "Label_SomeID"
+           gmail_starred = "true" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equivalent(
+        seq {
+            "Label_SomeID"
+            "STARRED"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )
+
+[<Fact>]
+let ``Shoutrrr JSON import sets Gmail important label`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr/json")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           ``type`` = "info"
+           gmail_important = "true" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equivalent(
+        seq {
+            "INBOX"
+            "IMPORTANT"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )

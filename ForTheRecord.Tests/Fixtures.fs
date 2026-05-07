@@ -22,7 +22,7 @@ open ForTheRecord.Imap
 
 type MockGmailInbox() =
     member val CalledImport: {| Message: MimeMessage
-                                LabelIds: string list option
+                                LabelIds: Set<string> option
                                 InternalDateSource: InternalDateSourceEnum option
                                 NeverMarkSpam: bool option
                                 ProcessForCalendar: bool option
@@ -41,7 +41,7 @@ type MockGmailInbox() =
             this.CalledImport <-
                 Some
                     {| Message = MimeMessage.Load message
-                       LabelIds = labelIds
+                       LabelIds = labelIds |> Option.map Set.ofList
                        InternalDateSource = internalDateSource
                        NeverMarkSpam = neverMarkSpam
                        ProcessForCalendar = processForCalendar

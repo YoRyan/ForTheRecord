@@ -1,8 +1,23 @@
-To: me
-From: Apprise via ForTheRecord <me>
-{% if type == "failure" -%}
-X-FTR-Gmail-LabelID: INBOX
+To: {{ to | default: "me" }}
+From: {{ from | default: "Apprise via ForTheRecord <me>" }}
+X-FTR-Gmail-LabelID: {{ gmail_label_id | default: "INBOX" }}
+{% if type == "failure" or gmail_starred -%}
 X-FTR-Gmail-LabelID: STARRED
+{% endif -%}
+{% if gmail_important -%}
+X-FTR-Gmail-LabelID: IMPORTANT
+{% endif -%}
+{% if gmail_internal_date_source -%}
+X-FTR-Gmail-InternalDateSource: {{ gmail_internal_date_source }}
+{% endif -%}
+{% if gmail_never_mark_spam -%}
+X-FTR-Gmail-NeverMarkSpam: {{ gmail_never_mark_spam }}
+{% endif -%}
+{% if gmail_process_for_calendar -%}
+X-FTR-Gmail-ProcessForCalendar: {{ gmail_process_for_calendar }}
+{% endif -%}
+{% if gmail_deleted -%}
+X-FTR-Gmail-Deleted: {{ gmail_deleted }}
 {% endif -%}
 {% capture type %}{% case type -%}
 {% when "info" %}📢{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️

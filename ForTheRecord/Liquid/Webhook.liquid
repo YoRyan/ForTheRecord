@@ -1,8 +1,12 @@
-To: me
-From: ForTheRecord <me>
-{% for label in gmail_label_ids -%}
-X-FTR-Gmail-LabelID: {{ label }}
-{% endfor -%}
+To: {{ to | default: "me" }}
+From: {{ from | default: "ForTheRecord <me>" }}
+X-FTR-Gmail-LabelID: {{ gmail_label_id | default: "INBOX" }}
+{% if gmail_starred -%}
+X-FTR-Gmail-LabelID: STARRED
+{% endif -%}
+{% if gmail_important -%}
+X-FTR-Gmail-LabelID: IMPORTANT
+{% endif -%}
 {% if gmail_internal_date_source -%}
 X-FTR-Gmail-InternalDateSource: {{ gmail_internal_date_source }}
 {% endif -%}
@@ -17,6 +21,6 @@ X-FTR-Gmail-Deleted: {{ gmail_deleted }}
 {% endif -%}
 {% if subject %}{% assign title = subject %}{% endif -%}
 Subject: {{ title | ftr_encode_utf8 }}
-Content-Type: text/plain
+Content-Type: {{ content_type | default: "text/plain" }}
 
 {{ message }}

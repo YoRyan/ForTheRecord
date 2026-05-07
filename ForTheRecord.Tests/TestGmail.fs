@@ -226,7 +226,16 @@ let ``Curl import with application/x-www-form-urlencoded works`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equivalent(Some [ "INBOX"; "STARRED" ], called.LabelIds)
+
+    Assert.Equivalent(
+        seq {
+            "INBOX"
+            "STARRED"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )
+
     Assert.Equivalent(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
     Assert.Equivalent(Some true, called.NeverMarkSpam)
     Assert.Equivalent(Some false, called.ProcessForCalendar)
@@ -285,7 +294,16 @@ let ``Curl import with multipart/form-data works`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equivalent(Some [ "INBOX"; "STARRED" ], called.LabelIds)
+
+    Assert.Equivalent(
+        seq {
+            "INBOX"
+            "STARRED"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )
+
     Assert.Equivalent(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
     Assert.Equivalent(Some true, called.NeverMarkSpam)
     Assert.Equivalent(Some false, called.ProcessForCalendar)
@@ -431,15 +449,16 @@ This is the label test message.
 
     let called = mock.CalledImport.Value
 
-    let expected =
+    Assert.Equivalent(
         seq {
             "INBOX"
             "MyAwesomeLabel"
             "MyAwesomeLabel2"
         }
-        |> Set.ofSeq
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )
 
-    Assert.Equivalent(expected, called.LabelIds |> Option.defaultValue [] |> Set.ofList)
     Assert.Equal(None, called.InternalDateSource)
     Assert.Equal(None, called.NeverMarkSpam)
     Assert.Equal(None, called.ProcessForCalendar)
@@ -474,4 +493,4 @@ This is the label test message.
     Assert.Equal(Some true, called.NeverMarkSpam)
     Assert.Equal(None, called.ProcessForCalendar)
     Assert.Equal(Some false, called.Deleted)
-    Assert.Equivalent(Set.empty, called.LabelIds |> Option.defaultValue [] |> Set.ofList)
+    Assert.Equal(None, called.LabelIds)
