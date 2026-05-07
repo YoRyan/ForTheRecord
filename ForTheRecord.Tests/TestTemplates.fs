@@ -137,6 +137,52 @@ Subject: Test Subject
     Assert.Contains("AzureDiamond says \"Hello, World!\"", body)
 
 [<Fact>]
+let ``JSON import handles reference to gmail`` () =
+    let mock = MockGmailInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpUrls = None
+          Templates =
+            Map(
+                seq {
+                    "test",
+                    """From: me
+To: me
+Subject: Test Subject
+
+{% if ftr.is_gmail -%}
+{{ message }}
+{% endif -%}
+"""
+                }
+            )
+          Inbox = Gmail(Set.empty, Set.empty, mock) }
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| message = "Hello, World!"
+           ftr_template = "test" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equal("Test Subject", called.Message.Subject)
+
+    let body =
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+
+    Assert.Contains("Hello, World!", body)
+
+[<Fact>]
 let ``JSON import handles missing template`` () =
     let mock = MockGmailInbox()
 

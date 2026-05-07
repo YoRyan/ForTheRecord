@@ -239,8 +239,12 @@ let private importWholeMessage (template: string) (modelKey: string) (model: obj
                 failwithf "Failed to parse template: %s" error
 
             let ftr =
-                [ "user", authenticatedUser ctx |> Option.defaultValue null
-                  "guid", Guid.NewGuid().ToString() ]
+                seq<string * obj> {
+                    "user", authenticatedUser ctx |> Option.defaultValue null :> obj
+                    "is_gmail", config.Inbox.IsGmail
+                    "is_imap", config.Inbox.IsImap
+                    "guid", Guid.NewGuid().ToString()
+                }
                 |> dict
 
             let options = ctx.GetService<TemplateOptions>()
