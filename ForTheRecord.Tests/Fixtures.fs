@@ -67,15 +67,14 @@ let getTestApp (config: ServeConfig) =
     app
 
 let testRequest (config: ServeConfig) (request: HttpRequestMessage) =
-    let resp =
-        task {
-            use server = config |> getTestApp |> _.GetTestServer()
-            use client = server.CreateClient()
-            let! response = request |> client.SendAsync
-            return response
-        }
-
-    resp.Result
+    task {
+        use server = config |> getTestApp |> _.GetTestServer()
+        use client = server.CreateClient()
+        let! response = request |> client.SendAsync
+        return response
+    }
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
 
 let mockGmailWithoutAuth () =
     let mock = MockGmailInbox()
