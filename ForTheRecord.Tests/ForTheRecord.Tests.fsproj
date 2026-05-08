@@ -8,7 +8,9 @@
   <ItemGroup>
     <Compile Include="Fixtures.fs" />
     <Compile Include="TestGmail.fs" />
-    <Compile Include="TestTemplates.fs" />
+    <Compile Include="TestWebhook.fs" />
+    <Compile Include="TestApprise.fs" />
+    <Compile Include="TestShoutrrr.fs" />
   </ItemGroup>
 
   <ItemGroup>
