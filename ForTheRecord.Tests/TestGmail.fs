@@ -173,7 +173,7 @@ let ``Easy curl import passes through headers`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equal("bob@example.com", called.Message.To.ToString())
+    Assert.Equal("bob@example.com", string called.Message.To)
     Assert.Equal("Hello, World!", called.Message.Subject)
 
 [<Fact>]
@@ -388,7 +388,7 @@ let ``Curl import passes through headers`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equal("bob@example.com", called.Message.To.ToString())
+    Assert.Equal("bob@example.com", string called.Message.To)
     Assert.Equal("Hello, World!", called.Message.Subject)
 
 [<Fact>]

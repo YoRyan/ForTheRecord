@@ -243,7 +243,7 @@ let private importWholeMessage (model: obj, modelKey: string option) (template: 
                     "user", authenticatedUser ctx |> Option.defaultValue null :> obj
                     "is_gmail", config.Inbox.IsGmail
                     "is_imap", config.Inbox.IsImap
-                    "guid", Guid.NewGuid().ToString()
+                    "guid", string (Guid.NewGuid())
                 }
                 |> dict
 
@@ -363,7 +363,7 @@ let private ntfyHandler (templateName: string option) =
                     {| topic = topic
                        event = "message"
                        message = "triggered"
-                       id = Guid.NewGuid().ToString()
+                       id = string (Guid.NewGuid())
                        time = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                        expires = Int32.MaxValue |}
                     |> JsonSerializer.Serialize
