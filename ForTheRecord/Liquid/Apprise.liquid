@@ -19,10 +19,17 @@ X-FTR-Gmail-ProcessForCalendar: {{ gmail_process_for_calendar }}
 {% if gmail_deleted -%}
 X-FTR-Gmail-Deleted: {{ gmail_deleted }}
 {% endif -%}
-{% capture type %}{% case type -%}
-{% when "info" %}📢{% when "success" %}✅{% when "failure" %}❌{% when "warning" %}⚠️
-{%- else %}[{{ type }}]{% endcase %}{% endcapture -%}
-{% capture subject %}{{ type }} {{ title }}{% endcapture -%}
+{% capture type -%}
+  {% case type -%}
+    {%- when "info" %}📢
+    {%- when "success" %}✅
+    {%- when "failure" %}❌
+    {%- when "warning" %}⚠️
+  {%- endcase -%}
+{% endcapture -%}
+{% capture subject -%}
+  {% if type != "" -%}{{ type }} {% endif %}{{ title }}
+{%- endcapture -%}
 Subject: {{ subject | ftr_encode_utf8 }}
 Content-Type: multipart/mixed; boundary={{ ftr.guid }}
 
@@ -30,15 +37,15 @@ Content-Type: multipart/mixed; boundary={{ ftr.guid }}
 {% if ftr_forcefarmot %}{% assign format = ftr_forcefarmot %}{% endif -%}
 {% if ftr_forceformat %}{% assign format = ftr_forceformat %}{% endif -%}
 {% case format -%}
-{% when "html" -%}
+  {%- when "html" -%}
 Content-Type: text/html
 
 {{ message }}
-{% when "markdown" -%}
+  {%- when "markdown" -%}
 Content-Type: text/html
 
 {{ message | ftr_markdown }}
-{% else -%}
+  {%- else -%}
 Content-Type: text/plain
 
 {{ message }}
