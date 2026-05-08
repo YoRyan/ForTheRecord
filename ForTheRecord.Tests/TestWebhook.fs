@@ -11,23 +11,35 @@ open ForTheRecord.Gmail
 
 open Fixtures
 
-[<Fact>]
-let ``JSON import requires Json request content`` () =
+[<Theory>]
+[<InlineData("/api/webhook")>]
+[<InlineData("/go/notify")>]
+[<InlineData("/apprise")>]
+[<InlineData("/shoutrrr/json")>]
+[<InlineData("/ntfy")>]
+[<InlineData("/ntfy_template/test")>]
+let ``JSON import requires Json request content`` (uri: string) =
     let config, _ = mockGmailWithoutAuth ()
 
-    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+    let request = new HttpRequestMessage(HttpMethod.Post, uri)
     use content = makeTextContent "Definitely not JSON!"
     request.Content <- content
 
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.NotAcceptable, response.StatusCode)
 
-[<Fact>]
-let ``JSON import requires Gmail insert scope when Gmail is configured`` () =
+[<Theory>]
+[<InlineData("/api/webhook")>]
+[<InlineData("/go/notify")>]
+[<InlineData("/apprise")>]
+[<InlineData("/shoutrrr/json")>]
+[<InlineData("/ntfy")>]
+[<InlineData("/ntfy_template/test")>]
+let ``JSON import requires Gmail insert scope when Gmail is configured`` (uri: string) =
     let config, _ = mockGmailWithHunter2Auth "AzureDiamond" false true
     let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
 
-    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+    let request = new HttpRequestMessage(HttpMethod.Post, uri)
     request.Headers.Authorization <- authHeader
 
     use content =
@@ -180,17 +192,14 @@ Subject: Test Subject
 
     Assert.Contains("Hello, World!", body)
 
-[<Fact>]
-let ``JSON import handles missing template`` () =
-    let mock = MockGmailInbox()
-
-    let config =
-        { Htpasswd = None
-          HttpUrls = None
-          Templates = Map.empty
-          Inbox = Gmail(Set.empty, Set.empty, mock) }
-
-    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+[<Theory>]
+[<InlineData("/api/webhook")>]
+[<InlineData("/go/notify")>]
+[<InlineData("/apprise")>]
+[<InlineData("/shoutrrr/json")>]
+let ``JSON import handles missing template`` (uri: string) =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, uri)
 
     use content =
         {| message = "whatever"

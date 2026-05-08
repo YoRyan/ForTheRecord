@@ -15,8 +15,10 @@ open ForTheRecord.Gmail
 
 open Fixtures
 
-[<Fact>]
-let ``Endpoints not available when Gmail is not configured`` () =
+[<Theory>]
+[<InlineData("/api/gmail/messages/import/ez")>]
+[<InlineData("/api/gmail/messages/import")>]
+let ``Endpoints not available when Gmail is not configured`` (uri: string) =
     let mock = MockImapInbox()
 
     let config =
@@ -25,15 +27,8 @@ let ``Endpoints not available when Gmail is not configured`` () =
           Templates = Map.empty
           Inbox = Imap(Set.empty, mock) }
 
-    let request =
-        new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/ez")
+    let request = new HttpRequestMessage(HttpMethod.Post, uri)
 
-    let response = testRequest config request
-    Assert.Equal(HttpStatusCode.Gone, response.StatusCode)
-
-    use content = new FormUrlEncodedContent(seq { "body", "" } |> Seq.map KeyValuePair)
-    let request = new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import")
-    request.Content <- content
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.Gone, response.StatusCode)
 
