@@ -1,6 +1,8 @@
 module ForTheRecord.Liquid
 
 open System
+open System.Net.Http
+open System.Reflection
 open System.Text
 open System.Text.Json
 open System.Threading.Tasks
@@ -8,6 +10,35 @@ open System.Threading.Tasks
 open Fluid
 open Fluid.Values
 open Markdig
+
+open ForTheRecord.Helpers
+
+/// Map of GitHub emoji codes to emojis.
+let private gemojiMap =
+    let assembly = Assembly.GetExecutingAssembly()
+
+    use stream =
+        assembly.GetManifestResourceStream $"{assembly.GetName().Name}.Gemoji.json"
+
+    stream
+    |> JsonSerializer.Deserialize<
+        {| emoji: string
+           aliases: string list |} list
+        >
+    |> Seq.ofList
+    |> Seq.map (fun e -> e.aliases |> Seq.ofList |> Seq.map (fun alias -> alias, e.emoji))
+    |> Seq.concat
+    |> Map.ofSeq
+
+let private httpClient =
+    let client = new HttpClient()
+    client.BaseAddress <- Uri "https://ntfy.sh"
+
+    client.DefaultRequestHeaders.UserAgent.TryParseAdd
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 Edg/147.0.0.0"
+    |> ignore
+
+    client
 
 type Filters() =
     /// Encodes an UTF-8 string inline so that it is safe for use in email
@@ -31,6 +62,50 @@ type Filters() =
         |> fun sv -> sv :> FluidValue
         |> ValueTask.FromResult
 
+    /// Convert a GitHub emoji code to its corresponding emoji.
+    static member gemoji (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
+        input
+        |> _.ToStringValue()
+        |> gemojiMap.TryGetValue
+        |> tryGetByref
+        |> Option.defaultValue null
+        |> StringValue
+        |> ValueTask.FromResult<FluidValue>
+
+    /// Escape a string for use in a single-quoted command-line argument.
+    static member singleShellEscape (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
+        input
+        |> _.ToStringValue()
+        |> _.Replace("'", "'\"'\"'")
+        |> StringValue
+        |> ValueTask.FromResult<FluidValue>
+
+    /// Download a URL, returning the obtained Content-Type header and base64 file content.
+    static member download (input: FluidValue) (_arguments: FilterArguments) (context: TemplateContext) =
+        task {
+            let url = input.ToStringValue()
+            let! response = httpClient.GetAsync url
+
+            if response.IsSuccessStatusCode then
+                let! bytes = response.Content.ReadAsByteArrayAsync()
+
+                let contentType =
+                    match response.Content.Headers.ContentType with
+                    | null -> null
+                    | hv -> hv.MediaType
+
+                return
+                    seq {
+                        "content_type", contentType |> StringValue
+                        "base64", bytes |> Convert.ToBase64String |> StringValue
+                    }
+                    |> dict
+                    |> fun d -> FluidValue.Create(d, context.Options)
+            else
+                return null
+        }
+        |> ValueTask<FluidValue>
+
 /// Create a template options object with our custom filters configured.
 let createTemplateOptions () =
     let options = TemplateOptions()
@@ -39,6 +114,9 @@ let createTemplateOptions () =
         seq {
             "ftr_encode_utf8", Filters.encodeUtf8
             "ftr_markdown", Filters.markdown
+            "ftr_gemoji", Filters.gemoji
+            "ftr_single_shell_escape", Filters.singleShellEscape
+            "ftr_download", Filters.download
         } do
         options.Filters.AddFilter(name, FilterDelegate d)
 

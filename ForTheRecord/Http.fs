@@ -314,6 +314,59 @@ let private webhookHandler = genericJson "Liquid.Webhook.liquid"
 
 let private appriseHandler = genericJson "Liquid.Apprise.liquid"
 
+let private ntfyMockResponse (topic: string) =
+    {| topic = topic
+       event = "message"
+       message = "triggered"
+       id = Guid.NewGuid().ToString()
+       time = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+       expires = Int32.MaxValue |}
+    |> JsonSerializer.Serialize
+    |> text
+    |> compose (setContentType "application/json")
+
+let private ntfyJsonFindTemplate (template: string option) =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        task {
+            let config = ctx.GetService<ServeConfig>()
+            let! json = ctx.BindJsonAsync<JsonElement>()
+
+            let! template =
+                match template with
+                | Some t ->
+                    match config.Templates.TryGetValue t with
+                    | false, _ -> None
+                    | true, t -> Some t
+                    |> Task.FromResult
+                | None ->
+                    task {
+                        let! t = readEmbeddedText "Liquid.Ntfy.liquid"
+                        return Some t
+                    }
+
+            let response =
+                json
+                |> tryJsonProperty "topic"
+                |> Option.filter (fun prop -> prop.ValueKind = JsonValueKind.String)
+                |> Option.map _.GetString()
+                |> Option.defaultValue ""
+                |> ntfyMockResponse
+
+            let handler =
+                (match template with
+                 | Some t -> json |> jsonLiquidModel |> importWholeMessage t ""
+                 | None -> text "Unknown template specified" |> unprocessableEntity)
+                >=> response
+
+            return! handler next ctx
+        }
+
+let private ntfyJsonHandler = requiresImportRole >=> ntfyJsonFindTemplate None
+
+let private ntfyJsonTemplateHandler capture =
+    requiresImportRole
+    >=> ntfyJsonFindTemplate (capture |> Seq.skip 1 |> Seq.exactlyOne |> Some)
+
 let private shoutrrrHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
@@ -362,7 +415,9 @@ let webApp =
                     route "/go/notify" >=> webhookHandler
                     route "/apprise" >=> appriseHandler
                     route "/shoutrrr" >=> requiresImportRole >=> shoutrrrHandler
-                    route "/shoutrrr/json" >=> webhookHandler ]
+                    route "/shoutrrr/json" >=> webhookHandler
+                    routex "^/ntfy/?$" >=> ntfyJsonHandler
+                    routexp "^/ntfy_template/([^/]+)/?$" ntfyJsonTemplateHandler ]
           RequestErrors.NOT_FOUND "404" ]
 
 let private validateCredentials (context: ValidateCredentialsContext) =

@@ -28,7 +28,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Gemoji.json" />
     <EmbeddedResource Include="Liquid\Apprise.liquid" />
+    <EmbeddedResource Include="Liquid\Ntfy.liquid" />
     <EmbeddedResource Include="Liquid\Shoutrrr.liquid" />
     <EmbeddedResource Include="Liquid\Webhook.liquid" />
   </ItemGroup>

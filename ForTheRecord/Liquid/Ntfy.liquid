@@ -1,0 +1,109 @@
+To: me
+From: Ntfy via ForTheRecord <me>
+{% case priority -%}
+  {% when 5 -%}
+X-FTR-Gmail-LabelID: STARRED
+X-FTR-Gmail-LabelID: IMPORTANT
+X-FTR-Gmail-LabelID: {{ topic }}
+  {% when 4 -%}
+X-FTR-Gmail-LabelID: IMPORTANT
+X-FTR-Gmail-LabelID: {{ topic }}
+  {% when 2, 1 -%}
+    {% if topic != "INBOX" -%}
+X-FTR-Gmail-LabelID: {{ topic }}
+    {% endif -%}
+  {% else -%}
+X-FTR-Gmail-LabelID: {{ topic }}
+{% endcase -%}
+{% capture tags -%}
+  {% for tag in tags -%}
+    {% capture gemoji %}{{ tag | ftr_gemoji }}{% endcapture -%}
+    {{ gemoji | default: tag -}}
+    {% unless forloop.last %},{% endunless -%}
+  {% endfor -%}
+{% endcapture -%}
+{% capture subject -%}
+  {% unless tags == "" %}[{{ tags }}] {% endunless %}{{ title }}
+{%- endcapture -%}
+Subject: {{ subject | ftr_encode_utf8 }}
+Content-Type: multipart/mixed; boundary={{ ftr.guid }}
+
+--{{ ftr.guid }}
+Content-Type: text/html
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#_ftr_ntfy_icon {
+    float: right;
+    height: 4rem;
+}
+#_ftr_ntfy_actions {
+    clear: right;
+    padding-left: 0;
+    text-align: center;
+    list-style-type: none;
+}
+#_ftr_ntfy_actions > li {
+    margin: 0.5rem 0;
+}
+#_ftr_ntfy_actions ._ftr_ntfy_action_label {
+    font-weight: bold;
+    font-size: 125%;
+}
+</style>
+</head>
+<body>
+{% if icon -%}
+<img id="_ftr_ntfy_icon" src="{{ icon }}" alt="Notification icon">
+{% endif -%}
+<div>
+{% if markdown -%}
+  {{ message | ftr_markdown }}
+{% else -%}
+  {{ message | escape_once }}
+{% endif -%}
+</div>
+<ul id="_ftr_ntfy_actions">
+{% if click -%}
+  <li>
+    <a class="_ftr_ntfy_action_label" href="{{ click }}">(Click)</a>
+  </li>
+{% endif -%}
+{% for action in actions -%}
+  {% case action.action -%}
+    {% when "view" -%}
+  <li>
+    <a class="_ftr_ntfy_action_label" href="{{ action.url }}">{{ action.label }}</a>
+  </li>
+    {% when "http" -%}
+  <li>
+    <span class="_ftr_ntfy_action_label">{{ action.label }}</span><br>
+      {% capture headers -%}
+        {% for pair in action.headers %} -H '{{ pair[0] | ftr_single_shell_escape }}: {{ pair[1] | ftr_single_shell_escape }}'{% endfor -%}
+      {% endcapture -%}
+    <textarea readonly>curl -X {{ action.method }} -d '{{ action.body | ftr_single_shell_escape }}'{{ headers }}</textarea>
+  </li>
+    {% when "copy" -%}
+  <li>
+    <span class="_ftr_ntfy_action_label">{{ action.label }}</span><br>
+    <textarea readonly>{{ action.value }}</textarea>
+  </li>
+  {% endcase -%}
+{% endfor -%}
+</ul>
+</body>
+</html>
+{% if attach -%}
+  {% assign download = attach | ftr_download -%}
+  {% if download -%}
+--{{ ftr.guid }}
+Content-Type: {{ download.content_type | default: "application/octet-stream" }}{% if filename %}; name="{{ filename | escape }}"{% endif %}
+Content-Disposition: attachment{% if filename %}; filename="{{ filename | escape }}"{% endif %}
+Content-Transfer-Encoding: base64
+
+{{ download.base64 }}
+  {% endif -%}
+{% endif -%}
+--{{ ftr.guid }}--
