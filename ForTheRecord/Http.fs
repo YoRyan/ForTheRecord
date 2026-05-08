@@ -78,7 +78,7 @@ let private mapHeaders (ctx: HttpContext) =
 
     headerList, contentType
 
-let private ezImportHandler =
+let private gmailImportHandlerSimple =
     handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
@@ -126,7 +126,7 @@ let private readAttachment (file: IFormFile) =
     attach.FileName <- file.FileName
     attach
 
-let private importHandler =
+let private gmailImportHandler =
     handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
@@ -227,7 +227,7 @@ let private requiresJson =
         { InvalidHeaderValue = None
           HeaderNotFound = None }
 
-let private importWholeMessage (template: string) (modelKey: string) (model: obj) =
+let private importWholeMessage (model: obj, modelKey: string option) (template: string) =
     handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
@@ -256,8 +256,9 @@ let private importWholeMessage (template: string) (modelKey: string) (model: obj
                         | Some d -> yield! d |> Seq.map (|KeyValue|)
                         | None -> ()
 
-                        if modelKey <> "" then
-                            modelKey, model
+                        match modelKey with
+                        | Some key -> key, model
+                        | None -> ()
 
                         "ftr", ftr
                     }
@@ -276,146 +277,164 @@ let private importWholeMessage (template: string) (modelKey: string) (model: obj
             return Some ctx
         })
 
-let private genericJsonFindTemplate (defaultTemplateName: string) =
+type private TemplateRequest =
+    | AsConfigured of name: string
+    | BuiltIn of fileName: string
+
+let private resolveTemplateForImport (request: TemplateRequest) (importerWithModel: Lazy<string -> HttpHandler>) =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let config = ctx.GetService<ServeConfig>()
+
+            match request with
+            | AsConfigured name ->
+                return!
+                    (match config.Templates.TryGetValue name with
+                     | true, template -> importerWithModel.Force () template
+                     | false, _ -> text "Unknown template specified" |> unprocessableEntity)
+                        next
+                        ctx
+            | BuiltIn fileName ->
+                let! template = readEmbeddedText fileName
+                return! importerWithModel.Force () template next ctx
+        }
+
+let private resolveTemplateForImportTask
+    (request: TemplateRequest)
+    (importerWithModel: Lazy<Task<string -> HttpHandler>>)
+    =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        task {
+            let config = ctx.GetService<ServeConfig>()
+
+            match request with
+            | AsConfigured name ->
+                match config.Templates.TryGetValue name with
+                | true, template ->
+                    let! importer = importerWithModel.Force()
+                    return! importer template next ctx
+                | false, _ -> return! unprocessableEntity (text "Unknown template specified") next ctx
+            | BuiltIn fileName ->
+                let! template = readEmbeddedText fileName
+                let! importer = importerWithModel.Force()
+                return! importer template next ctx
+        }
+
+let private genericJsonHandler (builtInTemplate: string) : HttpHandler =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        task {
             let! json = ctx.BindJsonAsync<JsonElement>()
 
-            let! template =
+            let request =
                 json
                 |> tryJsonProperty "ftr_template"
+                |> Option.bind tryJsonString
                 |> function
-                    | Some prop ->
-                        match prop |> _.ToString() |> config.Templates.TryGetValue with
-                        | false, _ -> None
-                        | true, t -> Some t
-                        |> Task.FromResult
-                    | None ->
-                        task {
-                            let! t = readEmbeddedText defaultTemplateName
-                            return Some t
-                        }
+                    | Some name -> AsConfigured name
+                    | None -> BuiltIn builtInTemplate
 
-            let handler =
-                match template with
-                | Some t -> json |> jsonLiquidModel |> importWholeMessage t "json"
-                | None -> text "Unknown template specified" |> unprocessableEntity
+            let importer =
+                lazy
+                    (let model = jsonLiquidModel json
+                     importWholeMessage (model, Some "json"))
 
-            return! handler next ctx
+            return! resolveTemplateForImport request importer next ctx
         }
 
-let private genericJsonHandler (defaultTemplateName: string) =
-    requiresImportRole
-    >=> requiresJson
-    >=> genericJsonFindTemplate defaultTemplateName
-
-let private webhookHandler = genericJsonHandler "Liquid.Webhook.liquid"
-
-let private ntfyMockResponse (topic: string) =
-    {| topic = topic
-       event = "message"
-       message = "triggered"
-       id = Guid.NewGuid().ToString()
-       time = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-       expires = Int32.MaxValue |}
-    |> JsonSerializer.Serialize
-    |> text
-    |> compose (setContentType "application/json")
-
-let private ntfyJsonFindTemplate (template: string option) =
+let private ntfyHandler (templateName: string option) =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
-            let config = ctx.GetService<ServeConfig>()
             let! json = ctx.BindJsonAsync<JsonElement>()
 
-            let! template =
-                match template with
-                | Some t ->
-                    match config.Templates.TryGetValue t with
-                    | false, _ -> None
-                    | true, t -> Some t
-                    |> Task.FromResult
-                | None ->
-                    task {
-                        let! t = readEmbeddedText "Liquid.Ntfy.liquid"
-                        return Some t
-                    }
+            match json |> tryJsonProperty "topic" |> Option.bind tryJsonString with
+            | Some topic ->
+                let request =
+                    templateName
+                    |> function
+                        | Some name -> AsConfigured name
+                        | None -> BuiltIn "Liquid.Ntfy.liquid"
 
-            let response =
-                json
-                |> tryJsonProperty "topic"
-                |> Option.filter (fun prop -> prop.ValueKind = JsonValueKind.String)
-                |> Option.map _.GetString()
-                |> Option.defaultValue ""
-                |> ntfyMockResponse
+                let importer =
+                    lazy
+                        (let model = jsonLiquidModel json
+                         importWholeMessage (model, None))
 
-            let handler =
-                (match template with
-                 | Some t -> json |> jsonLiquidModel |> importWholeMessage t ""
-                 | None -> text "Unknown template specified" |> unprocessableEntity)
-                >=> response
+                let response =
+                    {| topic = topic
+                       event = "message"
+                       message = "triggered"
+                       id = Guid.NewGuid().ToString()
+                       time = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                       expires = Int32.MaxValue |}
+                    |> JsonSerializer.Serialize
+                    |> text
+                    |> compose (setContentType "application/json")
 
-            return! handler next ctx
+                let handler = resolveTemplateForImport request importer >=> response
+                return! handler next ctx
+            | None -> return! badRequest (text "Missing Ntfy topic") next ctx
         }
-
-let private ntfyJsonHandler = requiresImportRole >=> ntfyJsonFindTemplate None
-
-let private ntfyJsonTemplateHandler capture =
-    requiresImportRole
-    >=> ntfyJsonFindTemplate (capture |> Seq.skip 1 |> Seq.exactlyOne |> Some)
 
 let private shoutrrrHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
-            let config = ctx.GetService<ServeConfig>()
-
-            let! template =
+            let request =
                 ctx.Request.Query.TryGetValue "ftr_template"
                 |> tryGetByref
                 |> function
-                    | Some sv ->
-                        match sv |> Seq.last |> config.Templates.TryGetValue with
-                        | false, _ -> None
-                        | true, t -> Some t
-                        |> Task.FromResult
-                    | None ->
-                        task {
-                            let! t = readEmbeddedText "Liquid.Shoutrrr.liquid"
-                            return Some t
-                        }
+                    | Some sv -> AsConfigured(Seq.last sv)
+                    | None -> BuiltIn "Liquid.Shoutrrr.liquid"
 
-            let! body = ctx.ReadBodyFromRequestAsync()
+            let importer =
+                lazy
+                    (task {
+                        let! body = ctx.ReadBodyFromRequestAsync()
+                        let model = seq<string * obj> { "message", body } |> dict
+                        return importWholeMessage (model, None)
+                    })
 
-            let handler =
-                match template with
-                | Some t ->
-                    let model = seq<string * obj> { "message", body } |> dict
-                    importWholeMessage t "" model
-                | None -> text "Unknown template specified" |> unprocessableEntity
-
-            return! handler next ctx
+            return! resolveTemplateForImportTask request importer next ctx
         }
+
+let gmailApiRoutes =
+    requiresRole Roles.gmailInsert
+    >=> requiresGmail
+    >=> choose
+            [ route "/api/gmail/messages/import/ez" >=> gmailImportHandlerSimple
+              route "/api/gmail/messages/import" >=> gmailImportHandler ]
+
+let webhookRoutes =
+    requiresImportRole
+    >=> requiresJson
+    >=> choose [ route "/api/webhook"; route "/go/notify" ]
+    >=> genericJsonHandler "Liquid.Webhook.liquid"
+
+let appriseRoutes =
+    requiresImportRole
+    >=> requiresJson
+    >=> route "/apprise"
+    >=> genericJsonHandler "Liquid.Apprise.liquid"
+
+let ntfyRoutes =
+    requiresImportRole
+    >=> choose
+            [ routex "^/ntfy/?$" >=> ntfyHandler None
+              routexp "^/ntfy_template/([^/]+)/?$" (fun capture ->
+                  let capture = List.ofSeq capture
+                  ntfyHandler (Some capture[1])) ]
+
+let shoutrrrRoutes =
+    requiresImportRole
+    >=> choose
+            [ route "/shoutrrr" >=> shoutrrrHandler
+              route "/shoutrrr/json"
+              >=> requiresJson
+              >=> genericJsonHandler "Liquid.Webhook.liquid" ]
 
 let webApp =
     choose
         [ POST
-          >=> choose
-                  [ route "/api/gmail/messages/import/ez"
-                    >=> requiresRole Roles.gmailInsert
-                    >=> requiresGmail
-                    >=> ezImportHandler
-                    route "/api/gmail/messages/import"
-                    >=> requiresRole Roles.gmailInsert
-                    >=> requiresGmail
-                    >=> importHandler
-                    route "/api/webhook" >=> webhookHandler
-                    route "/go/notify" >=> webhookHandler
-                    route "/apprise" >=> genericJsonHandler "Liquid.Apprise.liquid"
-                    route "/shoutrrr" >=> requiresImportRole >=> shoutrrrHandler
-                    route "/shoutrrr/json" >=> webhookHandler
-                    routex "^/ntfy/?$" >=> ntfyJsonHandler
-                    routexp "^/ntfy_template/([^/]+)/?$" ntfyJsonTemplateHandler ]
+          >=> choose [ gmailApiRoutes; webhookRoutes; appriseRoutes; ntfyRoutes; shoutrrrRoutes ]
           RequestErrors.NOT_FOUND "404" ]
 
 let private validateCredentials (context: ValidateCredentialsContext) =

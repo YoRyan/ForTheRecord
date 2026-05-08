@@ -25,6 +25,12 @@ let tryJsonProperty (name: string) (js: JsonElement) : JsonElement option =
     | JsonValueKind.Object -> js.TryGetProperty name |> tryGetByref
     | _ -> None
 
+/// Attempt to read a JSON property as a string.
+let tryJsonString (js: JsonElement) =
+    match js.ValueKind with
+    | JsonValueKind.String -> js |> _.GetString() |> Some
+    | _ -> None
+
 /// Read a text file embedded in the executing assembly.
 let readEmbeddedText (fileName: string) =
     let assembly = Assembly.GetExecutingAssembly()
