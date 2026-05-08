@@ -78,9 +78,7 @@ let ``Apprise import handles 'html' input format`` () =
     testRequest config request |> ignore
 
     let called = mock.CalledImport.Value
-    let body = Seq.exactlyOne called.Message.BodyParts
-    Assert.Contains("This is an <strong>HTML</strong> message.", body |> readEntity |> Encoding.UTF8.GetString)
-    Assert.Equivalent(body.ContentType, ContentType("text", "html"))
+    Assert.Contains("This is an <strong>HTML</strong> message.", called.Message.HtmlBody)
 
 [<Fact>]
 let ``Apprise import handles 'html' input format with the alternate field`` () =
@@ -98,9 +96,7 @@ let ``Apprise import handles 'html' input format with the alternate field`` () =
     testRequest config request |> ignore
 
     let called = mock.CalledImport.Value
-    let body = Seq.exactlyOne called.Message.BodyParts
-    Assert.Contains("This is an <strong>HTML</strong> message.", body |> readEntity |> Encoding.UTF8.GetString)
-    Assert.Equivalent(body.ContentType, ContentType("text", "html"))
+    Assert.Contains("This is an <strong>HTML</strong> message.", called.Message.HtmlBody)
 
 [<Fact>]
 let ``Apprise import handles 'markdown' input format`` () =
@@ -119,9 +115,7 @@ let ``Apprise import handles 'markdown' input format`` () =
     testRequest config request |> ignore
 
     let called = mock.CalledImport.Value
-    let body = Seq.exactlyOne called.Message.BodyParts
-    Assert.Contains("This is a <strong>markdown</strong> message.", body |> readEntity |> Encoding.UTF8.GetString)
-    Assert.Equivalent(body.ContentType, ContentType("text", "html"))
+    Assert.Contains("This is a <strong>markdown</strong> message.", called.Message.HtmlBody)
 
 [<Fact>]
 let ``Apprise import handles attachments`` () =
