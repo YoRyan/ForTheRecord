@@ -50,8 +50,7 @@ type Filters() =
         |> Convert.ToBase64String
         |> fun b64 -> $"=?UTF-8?B?{b64}?="
         |> StringValue
-        |> fun sv -> sv :> FluidValue
-        |> ValueTask.FromResult
+        |> ValueTask.FromResult<FluidValue>
 
     /// Converts Markdown to HTML.
     static member markdown (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
@@ -59,8 +58,7 @@ type Filters() =
         |> _.ToStringValue()
         |> Markdown.ToHtml
         |> StringValue
-        |> fun sv -> sv :> FluidValue
-        |> ValueTask.FromResult
+        |> ValueTask.FromResult<FluidValue>
 
     /// Convert a GitHub emoji code to its corresponding emoji.
     static member gemoji (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
