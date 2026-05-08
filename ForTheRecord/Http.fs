@@ -305,14 +305,12 @@ let private genericJsonFindTemplate (defaultTemplateName: string) =
             return! handler next ctx
         }
 
-let private genericJson (defaultTemplateName: string) =
+let private genericJsonHandler (defaultTemplateName: string) =
     requiresImportRole
     >=> requiresJson
     >=> genericJsonFindTemplate defaultTemplateName
 
-let private webhookHandler = genericJson "Liquid.Webhook.liquid"
-
-let private appriseHandler = genericJson "Liquid.Apprise.liquid"
+let private webhookHandler = genericJsonHandler "Liquid.Webhook.liquid"
 
 let private ntfyMockResponse (topic: string) =
     {| topic = topic
@@ -413,7 +411,7 @@ let webApp =
                     >=> importHandler
                     route "/api/webhook" >=> webhookHandler
                     route "/go/notify" >=> webhookHandler
-                    route "/apprise" >=> appriseHandler
+                    route "/apprise" >=> genericJsonHandler "Liquid.Apprise.liquid"
                     route "/shoutrrr" >=> requiresImportRole >=> shoutrrrHandler
                     route "/shoutrrr/json" >=> webhookHandler
                     routex "^/ntfy/?$" >=> ntfyJsonHandler
