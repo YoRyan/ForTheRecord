@@ -14,9 +14,11 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Hosting
 open MimeKit
+open Xunit
 
 open ForTheRecord.Config
 open ForTheRecord.Gmail
+open ForTheRecord.Helpers
 open ForTheRecord.Http
 open ForTheRecord.Imap
 
@@ -118,3 +120,16 @@ let readEntity (e: MimeEntity) =
     use stream = new MemoryStream()
     e.WriteTo stream
     stream.ToArray()
+
+let entityContainsBase64Of (e: MimeEntity) (data: byte array) =
+    let s = e |> readEntity |> Encoding.UTF8.GetString |> _.Replace("\n", "")
+    let b64 = Convert.ToBase64String data
+    Assert.Contains(b64, s)
+
+let downloadBytes (url: string) =
+    task {
+        let! response = httpClient.GetAsync url
+        return! response.Content.ReadAsByteArrayAsync()
+    }
+    |> Async.AwaitTask
+    |> Async.RunSynchronously

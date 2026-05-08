@@ -11,6 +11,7 @@
     <Compile Include="TestWebhook.fs" />
     <Compile Include="TestApprise.fs" />
     <Compile Include="TestShoutrrr.fs" />
+    <Compile Include="TestNtfy.fs" />
   </ItemGroup>
 
   <ItemGroup>

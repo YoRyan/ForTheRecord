@@ -1,7 +1,6 @@
 module ForTheRecord.Liquid
 
 open System
-open System.Net.Http
 open System.Reflection
 open System.Text
 open System.Text.Json
@@ -29,16 +28,6 @@ let private gemojiMap =
     |> Seq.map (fun e -> e.aliases |> Seq.ofList |> Seq.map (fun alias -> alias, e.emoji))
     |> Seq.concat
     |> Map.ofSeq
-
-let private httpClient =
-    let client = new HttpClient()
-    client.BaseAddress <- Uri "https://ntfy.sh"
-
-    client.DefaultRequestHeaders.UserAgent.TryParseAdd
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 Edg/147.0.0.0"
-    |> ignore
-
-    client
 
 type Filters() =
     /// Encodes an UTF-8 string inline so that it is safe for use in email

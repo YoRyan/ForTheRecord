@@ -141,11 +141,11 @@ let importWholeMessageToGmail (inbox: IGmailInbox) (message: Stream) =
             (None, headers)
             ||> Seq.fold (fun state h ->
                 if h.Field.ToLowerInvariant() = "x-ftr-gmail-labelid" then
-                    let labelId = h.Value
-
-                    match state with
-                    | Some s -> Set.add labelId s
-                    | None -> Set.singleton labelId
+                    match state, h.Value with
+                    | Some s, labelId -> Set.add labelId s
+                    // User can set a blank header to explicitly request no labels.
+                    | None, "" -> Set.empty
+                    | None, labelId -> Set.singleton labelId
                     |> Some
                 else
                     state)

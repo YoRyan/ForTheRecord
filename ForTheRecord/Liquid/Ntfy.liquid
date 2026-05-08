@@ -4,17 +4,20 @@ From: Ntfy via ForTheRecord <me>
   {% when 5 -%}
 X-FTR-Gmail-LabelID: STARRED
 X-FTR-Gmail-LabelID: IMPORTANT
-X-FTR-Gmail-LabelID: {{ topic }}
+X-FTR-Gmail-LabelID: {{ topic -}}
   {% when 4 -%}
 X-FTR-Gmail-LabelID: IMPORTANT
-X-FTR-Gmail-LabelID: {{ topic }}
+X-FTR-Gmail-LabelID: {{ topic -}}
   {% when 2, 1 -%}
-    {% if topic != "INBOX" -%}
-X-FTR-Gmail-LabelID: {{ topic }}
+    {% if topic == "INBOX" -%}
+      {% comment %}Explicitly drop the INBOX label.{% endcomment -%}
+X-FTR-Gmail-LabelID:
+    {% else -%}
+X-FTR-Gmail-LabelID: {{ topic -}}
     {% endif -%}
   {% else -%}
-X-FTR-Gmail-LabelID: {{ topic }}
-{% endcase -%}
+X-FTR-Gmail-LabelID: {{ topic -}}
+{% endcase %}
 {% capture tags -%}
   {% for tag in tags -%}
     {% capture gemoji %}{{ tag | ftr_gemoji }}{% endcapture -%}
@@ -83,7 +86,7 @@ Content-Type: text/html
       {% capture headers -%}
         {% for pair in action.headers %} -H '{{ pair[0] | ftr_single_shell_escape }}: {{ pair[1] | ftr_single_shell_escape }}'{% endfor -%}
       {% endcapture -%}
-    <textarea readonly>curl -X {{ action.method }} -d '{{ action.body | ftr_single_shell_escape }}'{{ headers }}</textarea>
+    <textarea readonly>curl -X {{ action.method }} -d '{{ action.body | ftr_single_shell_escape }}'{{ headers }} {{ action.url }}</textarea>
   </li>
     {% when "copy" -%}
   <li>
