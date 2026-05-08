@@ -420,8 +420,8 @@ let ntfyRoutes =
     >=> choose
             [ routex "^/ntfy/?$" >=> ntfyHandler None
               routexp "^/ntfy_template/([^/]+)/?$" (fun capture ->
-                  let capture = List.ofSeq capture
-                  ntfyHandler (Some capture[1])) ]
+                  let template = Seq.item 1 capture
+                  ntfyHandler (Some template)) ]
 
 let shoutrrrRoutes =
     requiresImportRole
