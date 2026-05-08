@@ -34,9 +34,7 @@ Subject: {{ subject | ftr_encode_utf8 }}
 Content-Type: multipart/mixed; boundary={{ ftr.guid }}
 
 --{{ ftr.guid }}
-{% if ftr_forcefarmot %}{% assign format = ftr_forcefarmot %}{% endif -%}
-{% if ftr_forceformat %}{% assign format = ftr_forceformat %}{% endif -%}
-{% case format -%}
+{% case ftr_input_format -%}
   {%- when "html" -%}
 Content-Type: text/html
 

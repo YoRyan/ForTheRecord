@@ -22,8 +22,7 @@ let ``Apprise import works`` () =
         {| title = "Hello, World!"
            message =
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-           ``type`` = "info"
-           format = "text" |}
+           ``type`` = "info" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -51,7 +50,7 @@ let ``Apprise import handles 'text' input format`` () =
     use content =
         {| message = "This is a plain text message."
            ``type`` = "info"
-           ftr_forceformat = "text" |}
+           ftr_input_format = "text" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -71,25 +70,7 @@ let ``Apprise import handles 'html' input format`` () =
         {| title = ""
            message = "This is an <strong>HTML</strong> message."
            ``type`` = "info"
-           ftr_forceformat = "html" |}
-        |> makeJsonContent
-
-    request.Content <- content
-    testRequest config request |> ignore
-
-    let called = mock.CalledImport.Value
-    Assert.Contains("This is an <strong>HTML</strong> message.", called.Message.HtmlBody)
-
-[<Fact>]
-let ``Apprise import handles 'html' input format with the alternate field`` () =
-    let config, mock = mockGmailWithoutAuth ()
-    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
-
-    use content =
-        {| message = "This is an <strong>HTML</strong> message."
-           ``type`` = "info"
-           format = "text"
-           ftr_forcefarmot = "html" |}
+           ftr_input_format = "html" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -108,7 +89,7 @@ let ``Apprise import handles 'markdown' input format`` () =
            message = "This is a **markdown** message."
            ``type`` = "info"
            attachments = []
-           ftr_forceformat = "markdown" |}
+           ftr_input_format = "markdown" |}
         |> makeJsonContent
 
     request.Content <- content
@@ -141,8 +122,7 @@ let ``Apprise import handles attachments`` () =
                     {| filename = filename
                        mimetype = mimetype
                        base64 = base64 |})
-                data
-           format = "text" |}
+                data |}
         |> makeJsonContent
 
     request.Content <- content
@@ -200,7 +180,6 @@ This is a test using custom templates.
            message =
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
            ``type`` = "info"
-           format = "text"
            ftr_template = "test" |}
         |> makeJsonContent
 

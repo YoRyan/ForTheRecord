@@ -45,8 +45,7 @@ let ``JSON import requires Gmail insert scope when Gmail is configured`` (uri: s
     use content =
         {| title = "Title"
            message = "Whatever"
-           ``type`` = "info"
-           format = "text" |}
+           ``type`` = "info" |}
         |> makeJsonContent
 
     request.Content <- content
