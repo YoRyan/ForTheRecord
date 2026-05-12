@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 COPY . .
-RUN ./get-resources.sh
+RUN dotnet tool restore
 RUN dotnet restore ForTheRecord/ForTheRecord.fsproj
 RUN dotnet publish ForTheRecord/ForTheRecord.fsproj -c release -o /app --no-self-contained --no-restore
 

@@ -17,7 +17,7 @@ let private gemojiMap =
     let assembly = Assembly.GetExecutingAssembly()
 
     use stream =
-        assembly.GetManifestResourceStream $"{assembly.GetName().Name}.Gemoji.json"
+        assembly.GetManifestResourceStream $"{assembly.GetName().Name}.emoji.json"
 
     stream
     |> JsonSerializer.Deserialize<

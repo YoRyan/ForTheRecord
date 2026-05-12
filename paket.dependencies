@@ -1,0 +1,20 @@
+source https://api.nuget.org/v3/index.json
+
+storage: none
+
+nuget coverlet.collector
+nuget Fluid.Core ~> 2
+nuget Giraffe ~> 8
+nuget Google.Apis.Gmail.v1 ~> 1
+nuget idunno.Authentication.Basic ~> 2
+nuget MailKitLite ~> 4
+nuget Markdig ~> 1
+nuget Meziantou.Framework.Http.Htpasswd ~> 1
+nuget Microsoft.AspNetCore.TestHost
+nuget Microsoft.NET.Test.Sdk
+nuget System.CommandLine ~> 2
+nuget Tomlyn ~> 2
+nuget xunit ~> 2
+nuget xunit.runner.visualstudio
+
+github github/gemoji db/emoji.json

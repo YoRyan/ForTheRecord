@@ -1,10 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="Helpers.fs" />
     <Compile Include="Liquid.fs" />
@@ -13,26 +12,11 @@
     <Compile Include="Config.fs" />
     <Compile Include="Http.fs" />
     <Compile Include="Program.fs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Fluid.Core" Version="2.31.0" />
-    <PackageReference Include="Giraffe" Version="8.2.0" />
-    <PackageReference Include="Google.Apis.Gmail.v1" Version="1.73.0.4029" />
-    <PackageReference Include="idunno.Authentication.Basic" Version="2.4.0" />
-    <PackageReference Include="MailKitLite" Version="4.16.0" />
-    <PackageReference Include="Markdig" Version="1.1.3" />
-    <PackageReference Include="Meziantou.Framework.Http.Htpasswd" Version="1.0.0" />
-    <PackageReference Include="System.CommandLine" Version="2.0.5" />
-    <PackageReference Include="Tomlyn" Version="2.3.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Gemoji.json" />
     <EmbeddedResource Include="Liquid\Apprise.liquid" />
     <EmbeddedResource Include="Liquid\Ntfy.liquid" />
     <EmbeddedResource Include="Liquid\Shoutrrr.liquid" />
     <EmbeddedResource Include="Liquid\Webhook.liquid" />
+    <EmbeddedResource Include="..\paket-files\github\gemoji\db\emoji.json" />
   </ItemGroup>
-
+  <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>
