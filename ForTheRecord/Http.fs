@@ -180,46 +180,41 @@ let private requiresGmail =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         let config = ctx.GetService<ServeConfig>()
 
-        (if config.Inbox.IsGmail then
-             id
-         else
-             RequestErrors.GONE "Gmail not configured")
-            next
-            ctx
+        match config.Inbox with
+        | Gmail _ -> next ctx
+        | Imap _ -> GONE "Gmail not configured" earlyReturn ctx
 
 let private requiresImap =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         let config = ctx.GetService<ServeConfig>()
 
-        (if config.Inbox.IsImap then
-             id
-         else
-             RequestErrors.GONE "IMAP not configured")
-            next
-            ctx
+        match config.Inbox with
+        | Imap _ -> next ctx
+        | Gmail _ -> GONE "IMAP not configured" earlyReturn ctx
 
 let private requiresRole role =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         let config = ctx.GetService<ServeConfig>()
 
-        (if config.Htpasswd.IsSome then
-             requiresAuthentication (RequestErrors.UNAUTHORIZED "Basic" Realms.configured "Authentication failed")
-             >=> requiresRole role (RequestErrors.FORBIDDEN "Required scope not granted")
-         else
-             id)
-            next
-            ctx
+        match config.Htpasswd with
+        | Some _ ->
+            let handler =
+                requiresAuthentication (RequestErrors.UNAUTHORIZED "Basic" Realms.configured "Authentication failed")
+                >=> requiresRole role (RequestErrors.FORBIDDEN "Required scope not granted")
+
+            handler next ctx
+        | None -> next ctx
 
 let private requiresImportRole =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         let config = ctx.GetService<ServeConfig>()
 
-        requiresRole
-            (match config.Inbox with
-             | Gmail _ -> Roles.gmailInsert
-             | Imap _ -> Roles.imapAppend)
-            next
-            ctx
+        let role =
+            match config.Inbox with
+            | Gmail _ -> Roles.gmailInsert
+            | Imap _ -> Roles.imapAppend
+
+        requiresRole role next ctx
 
 let private requiresJson =
     hasContentType
@@ -288,15 +283,15 @@ let private resolveTemplateForImport (request: TemplateRequest) (importerWithMod
 
             match request with
             | AsConfigured name ->
-                return!
-                    (match config.Templates.TryGetValue name with
-                     | true, template -> importerWithModel.Force () template
-                     | false, _ -> text "Unknown template specified" |> unprocessableEntity)
-                        next
-                        ctx
+                match config.Templates.TryGetValue name with
+                | true, template ->
+                    let importer = importerWithModel.Force()
+                    return! importer template next ctx
+                | false, _ -> return! unprocessableEntity (text "Unknown template specified") earlyReturn ctx
             | BuiltIn fileName ->
+                let importer = importerWithModel.Force()
                 let! template = readEmbeddedText fileName
-                return! importerWithModel.Force () template next ctx
+                return! importer template next ctx
         }
 
 let private resolveTemplateForImportTask
@@ -313,10 +308,10 @@ let private resolveTemplateForImportTask
                 | true, template ->
                     let! importer = importerWithModel.Force()
                     return! importer template next ctx
-                | false, _ -> return! unprocessableEntity (text "Unknown template specified") next ctx
+                | false, _ -> return! unprocessableEntity (text "Unknown template specified") earlyReturn ctx
             | BuiltIn fileName ->
-                let! template = readEmbeddedText fileName
                 let! importer = importerWithModel.Force()
+                and! template = readEmbeddedText fileName
                 return! importer template next ctx
         }
 
@@ -372,7 +367,7 @@ let private ntfyHandler (templateName: string option) =
 
                 let handler = resolveTemplateForImport request importer >=> response
                 return! handler next ctx
-            | None -> return! badRequest (text "Missing Ntfy topic") next ctx
+            | None -> return! badRequest (text "Missing Ntfy topic") earlyReturn ctx
         }
 
 let private shoutrrrHandler =
