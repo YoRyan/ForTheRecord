@@ -4,7 +4,7 @@ WORKDIR /src
 COPY . .
 RUN dotnet tool restore
 RUN dotnet restore ForTheRecord/ForTheRecord.fsproj
-RUN dotnet publish ForTheRecord/ForTheRecord.fsproj -c release -o /app --no-self-contained --no-restore
+RUN dotnet publish ForTheRecord/ForTheRecord.fsproj -c release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 
