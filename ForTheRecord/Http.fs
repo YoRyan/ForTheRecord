@@ -32,9 +32,6 @@ module private Roles =
     let gmailInsert = "GmailInsert"
 
     [<Literal>]
-    let gmailSend = "GmailSend"
-
-    [<Literal>]
     let imapAppend = "ImapAppend"
 
 let private parseContentType (s: string) =
@@ -266,7 +263,7 @@ let private importWholeMessage (model: obj, modelKey: string option) (template: 
 
             do!
                 match config.Inbox with
-                | Gmail(_, _, inbox) -> importWholeMessageToGmail inbox stream
+                | Gmail(_, inbox) -> importWholeMessageToGmail inbox stream
                 | Imap(_, inbox) -> failwith "Not Implemented"
 
             return Some ctx
@@ -453,9 +450,7 @@ let private validateCredentials (context: ValidateCredentialsContext) =
                 ClaimTypes.Name, context.Username
 
                 match config.Inbox with
-                | Gmail(authInsert, authSend, _inbox) ->
-                    yield! checkedRole authInsert Roles.gmailInsert
-                    yield! checkedRole authSend Roles.gmailSend
+                | Gmail(authInsert, _inbox) -> yield! checkedRole authInsert Roles.gmailInsert
                 | Imap(authAppend, _inbox) -> yield! checkedRole authAppend Roles.imapAppend
             }
             |> Seq.map (fun (``type``, value) ->

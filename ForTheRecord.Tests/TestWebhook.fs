@@ -36,7 +36,7 @@ let ``JSON import requires Json request content`` (uri: string) =
 [<InlineData("/ntfy")>]
 [<InlineData("/ntfy_template/test")>]
 let ``JSON import requires Gmail insert scope when Gmail is configured`` (uri: string) =
-    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" false true
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" false
     let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
 
     let request = new HttpRequestMessage(HttpMethod.Post, uri)
@@ -72,7 +72,7 @@ Subject: Test Subject
 """
                 }
             )
-          Inbox = Gmail(Set.empty, Set.empty, mock) }
+          Inbox = Gmail(Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
 
@@ -102,7 +102,7 @@ Subject: Test Subject
 
 [<Fact>]
 let ``JSON import handles custom template with reference to user`` () =
-    let config, mock = mockGmailWithHunter2Auth "AzureDiamond" true false
+    let config, mock = mockGmailWithHunter2Auth "AzureDiamond" true
 
     let config =
         { Htpasswd = config.Htpasswd
@@ -166,7 +166,7 @@ Subject: Test Subject
 """
                 }
             )
-          Inbox = Gmail(Set.empty, Set.empty, mock) }
+          Inbox = Gmail(Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
 

@@ -56,7 +56,7 @@ Here's my message! {{ message }}
 """
                 }
             )
-          Inbox = Gmail(Set.empty, Set.empty, mock) }
+          Inbox = Gmail(Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr?ftr_template=test")
     use content = makeTextContent "Hello, World!"
@@ -79,7 +79,7 @@ Here's my message! {{ message }}
 
 [<Fact>]
 let ``Shoutrrr import handles custom template with reference to user`` () =
-    let config, mock = mockGmailWithHunter2Auth "AzureDiamond" true false
+    let config, mock = mockGmailWithHunter2Auth "AzureDiamond" true
 
     let config =
         { Htpasswd = config.Htpasswd
@@ -266,7 +266,7 @@ Here's my message! {{ message }}
 """
                 }
             )
-          Inbox = Gmail(Set.empty, Set.empty, mock) }
+          Inbox = Gmail(Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/shoutrrr/json")
 

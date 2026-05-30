@@ -50,7 +50,7 @@ let ``Authenticated endpoints work when authentication is disabled`` () =
 
 [<Fact>]
 let ``Authenticated endpoints require authentication`` () =
-    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true true
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true
 
     let request =
         new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/ez")
@@ -66,7 +66,7 @@ let ``Authenticated endpoints require authentication`` () =
 
 [<Fact>]
 let ``Authenticated endpoints work with basic authentication`` () =
-    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true true
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true
     let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
 
     let request =
@@ -85,7 +85,7 @@ let ``Authenticated endpoints work with basic authentication`` () =
 
 [<Fact>]
 let ``Authenticated endpoints fail with bad authentication`` () =
-    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true true
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" true
     let authHeader = makeBasicAuth "AzureDiamond" "whatever"
 
     let request =
@@ -104,7 +104,7 @@ let ``Authenticated endpoints fail with bad authentication`` () =
 
 [<Fact>]
 let ``Authenticated import endpoints require the insert scope`` () =
-    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" false true
+    let config, _ = mockGmailWithHunter2Auth "AzureDiamond" false
     let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
 
     let request =

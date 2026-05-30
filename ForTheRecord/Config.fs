@@ -17,7 +17,7 @@ open ForTheRecord.Imap
 let private applicationName = "ForTheRecord"
 
 type ConfiguredInbox =
-    | Gmail of authInsert: Set<string> * authSend: Set<string> * inbox: IGmailInbox
+    | Gmail of authInsert: Set<string> * inbox: IGmailInbox
     | Imap of authAppend: Set<string> * inbox: IImapInbox
 
 type ServeConfig =
@@ -83,20 +83,12 @@ let loadGmailConfig (t: TomlTable) =
             |> Option.defaultValue []
             |> Set.ofList
 
-        let authSend =
-            googleScopes
-            |> Option.bind (inTable "gmail")
-            |> Option.bind (inTable "send")
-            |> Option.map asList
-            |> Option.defaultValue []
-            |> Set.ofList
-
-        return Gmail(authInsert, authSend, GmailInbox service)
+        return Gmail(authInsert, GmailInbox service)
     }
 
 let getGmailInbox (config: ServeConfig) =
     match config.Inbox with
-    | Gmail(_authInsert, _authSend, inbox) -> inbox
+    | Gmail(_authInsert, inbox) -> inbox
     | _ -> raise (InvalidOperationException())
 
 let getImapInbox (config: ServeConfig) =

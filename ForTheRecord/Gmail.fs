@@ -65,12 +65,7 @@ let loadCredentials (codeReceiver: ICodeReceiver) (file: FileInfo) (store: Direc
         let initializer = GoogleAuthorizationCodeFlow.Initializer()
         initializer.ClientSecrets <- secrets.Secrets
         initializer.DataStore <- new FileDataStore(store.FullName, true)
-
-        initializer.Scopes <-
-            seq {
-                GmailService.Scope.GmailInsert
-                GmailService.Scope.GmailSend
-            }
+        initializer.Scopes <- seq { GmailService.Scope.GmailInsert }
 
         return!
             AuthorizationCodeInstalledApp(new GoogleAuthorizationCodeFlow(initializer), codeReceiver)

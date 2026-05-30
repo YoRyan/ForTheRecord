@@ -373,7 +373,7 @@ Here's my amazing message: {{ message }}
 """
                 }
             )
-          Inbox = Gmail(Set.empty, Set.empty, mock) }
+          Inbox = Gmail(Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy_template/test")
 

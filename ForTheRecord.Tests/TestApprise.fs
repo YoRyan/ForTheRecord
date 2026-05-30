@@ -171,7 +171,7 @@ This is a test using custom templates.
 """
                 }
             )
-          Inbox = Gmail(Set.empty, Set.empty, mock) }
+          Inbox = Gmail(Set.empty, mock) }
 
     let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
 
