@@ -47,7 +47,7 @@ Content-Type: text/html
 Content-Type: text/plain
 
 {{ message }}
-{% endcase -%}
+{% endcase %}
 {% for attach in attachments -%}
 --{{ ftr.guid }}
 Content-Type: {{ attach.mimetype }}; name="{{ attach.filename | escape }}"
