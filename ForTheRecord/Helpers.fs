@@ -28,6 +28,14 @@ let tryGetByref<'T> =
     | (true, v: 'T) -> Some v
     | false, _ -> None
 
+/// Try to build a dictionary from a sequence of key-value pairs, returning None
+/// if the resulting dictionary would be empty.
+let tryNonEmptyDict<'K, 'V when 'K: equality> (keyValuePairs: ('K * 'V) seq) =
+    if Seq.isEmpty keyValuePairs then
+        None
+    else
+        Some(dict keyValuePairs)
+
 /// Attempt to read a property from a JSON element, checking that it's actually
 /// an object first. This is most useful for the top-level element, which is
 /// usually (but need not necessarily be) an object.

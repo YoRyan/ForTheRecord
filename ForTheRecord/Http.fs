@@ -219,7 +219,7 @@ let private requiresJson =
         { InvalidHeaderValue = None
           HeaderNotFound = None }
 
-let private importWholeMessage (model: obj, modelKey: string option) (template: string) =
+let private importWholeMessage (template: string) (model: obj, modelKey: string option) =
     handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
@@ -269,159 +269,154 @@ let private importWholeMessage (model: obj, modelKey: string option) (template: 
             return Some ctx
         })
 
-type private TemplateRequest =
-    | AsConfigured of name: string
-    | BuiltIn of fileName: string
+let private resolveTemplate (ctx: HttpContext) (builtIn: AssemblyTemplate) (request: string option) =
+    task {
+        let config = ctx.GetService<ServeConfig>()
 
-let private resolveTemplateForImport (request: TemplateRequest) (importerWithModel: Lazy<string -> HttpHandler>) =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
-        task {
-            let config = ctx.GetService<ServeConfig>()
+        match request with
+        | Some name ->
+            match config.Templates.TryGetValue name with
+            | true, template -> return Ok template
+            | false, _ -> return Error "Named template does not exist"
+        | None ->
+            let! template = readAssemblyTemplate builtIn
+            return Ok template
+    }
 
-            match request with
-            | AsConfigured name ->
-                match config.Templates.TryGetValue name with
-                | true, template ->
-                    let importer = importerWithModel.Force()
-                    return! importer template next ctx
-                | false, _ -> return! unprocessableEntity (text "Unknown template specified") earlyReturn ctx
-            | BuiltIn fileName ->
-                let importer = importerWithModel.Force()
-                let! template = readEmbeddedText fileName
-                return! importer template next ctx
-        }
-
-let private resolveTemplateForImportTask
-    (request: TemplateRequest)
-    (importerWithModel: Lazy<Task<string -> HttpHandler>>)
-    =
-    fun (next: HttpFunc) (ctx: HttpContext) ->
-        task {
-            let config = ctx.GetService<ServeConfig>()
-
-            match request with
-            | AsConfigured name ->
-                match config.Templates.TryGetValue name with
-                | true, template ->
-                    let! importer = importerWithModel.Force()
-                    return! importer template next ctx
-                | false, _ -> return! unprocessableEntity (text "Unknown template specified") earlyReturn ctx
-            | BuiltIn fileName ->
-                let! importer = importerWithModel.Force()
-                and! template = readEmbeddedText fileName
-                return! importer template next ctx
-        }
-
-let private genericJsonHandler (builtInTemplate: string) : HttpHandler =
+let private genericJsonHandler (builtInTemplate: AssemblyTemplate) : HttpHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let! json = ctx.BindJsonAsync<JsonElement>()
 
-            let request =
+            let! template =
                 json
                 |> tryJsonProperty "ftr_template"
                 |> Option.bind tryJsonString
-                |> function
-                    | Some name -> AsConfigured name
-                    | None -> BuiltIn builtInTemplate
+                |> resolveTemplate ctx builtInTemplate
 
-            let importer =
-                lazy
-                    (let model = jsonLiquidModel json
-                     importWholeMessage (model, Some "json"))
-
-            return! resolveTemplateForImport request importer next ctx
+            match template with
+            | Ok template ->
+                let model = jsonLiquidModel json
+                return! importWholeMessage template (model, Some "json") next ctx
+            | Error err -> return! unprocessableEntity (text err) earlyReturn ctx
         }
 
-let private ntfyHandler (templateName: string option) =
+let private ntfyMockResponse (topic: string) =
+    {| topic = topic
+       event = "message"
+       message = "triggered"
+       id = string (Guid.NewGuid())
+       time = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+       expires = Int32.MaxValue |}
+    |> JsonSerializer.Serialize
+    |> text
+    |> compose (setContentType "application/json")
+
+let private ntfyJsonHandler (templateName: string option) =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
             let! json = ctx.BindJsonAsync<JsonElement>()
+            and! template = resolveTemplate ctx Ntfy templateName
+            let topic = json |> tryJsonProperty "topic" |> Option.bind tryJsonString
 
-            match json |> tryJsonProperty "topic" |> Option.bind tryJsonString with
-            | Some topic ->
-                let request =
-                    templateName
-                    |> function
-                        | Some name -> AsConfigured name
-                        | None -> BuiltIn "Liquid.Ntfy.liquid"
-
-                let importer =
-                    lazy
-                        (let model = jsonLiquidModel json
-                         importWholeMessage (model, None))
-
-                let response =
-                    {| topic = topic
-                       event = "message"
-                       message = "triggered"
-                       id = string (Guid.NewGuid())
-                       time = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                       expires = Int32.MaxValue |}
-                    |> JsonSerializer.Serialize
-                    |> text
-                    |> compose (setContentType "application/json")
-
-                let handler = resolveTemplateForImport request importer >=> response
+            match topic, template with
+            | Some topic, Ok template ->
+                let model = jsonLiquidModel json
+                let handler = importWholeMessage template (model, None) >=> ntfyMockResponse topic
                 return! handler next ctx
-            | None -> return! badRequest (text "Missing Ntfy topic") earlyReturn ctx
+            | None, _ -> return! badRequest (text "Missing Ntfy topic") earlyReturn ctx
+            | _, Error err -> return! unprocessableEntity (text err) earlyReturn ctx
+        }
+
+let private ntfySimpleHandler (templateName: string option) (topic: string) =
+    fun (next: HttpFunc) (ctx: HttpContext) ->
+        task {
+            let! template = resolveTemplate ctx Ntfy templateName
+
+            match template with
+            | Ok template ->
+                let! body = ctx.ReadBodyFromRequestAsync()
+
+                let model =
+                    seq {
+                        KeyValuePair("topic", topic :> obj)
+                        KeyValuePair("message", body)
+                        yield! ntfyModelFromRequest ctx.Request
+                    }
+                    |> Dictionary
+
+                let handler = importWholeMessage template (model, None) >=> ntfyMockResponse topic
+                return! handler next ctx
+            | Error err -> return! unprocessableEntity (text err) earlyReturn ctx
         }
 
 let private shoutrrrHandler =
     fun (next: HttpFunc) (ctx: HttpContext) ->
         task {
-            let request =
+            let! template =
                 ctx.Request.Query.TryGetValue "ftr_template"
                 |> tryGetByref
-                |> function
-                    | Some sv -> AsConfigured(Seq.last sv)
-                    | None -> BuiltIn "Liquid.Shoutrrr.liquid"
+                |> Option.map Seq.last
+                |> resolveTemplate ctx Shoutrrr
 
-            let importer =
-                lazy
-                    (task {
-                        let! body = ctx.ReadBodyFromRequestAsync()
-                        let model = seq<string * obj> { "message", body } |> dict
-                        return importWholeMessage (model, None)
-                    })
-
-            return! resolveTemplateForImportTask request importer next ctx
+            match template with
+            | Ok template ->
+                let! body = ctx.ReadBodyFromRequestAsync()
+                let model = Dictionary<string, obj>()
+                model.Add("message", body)
+                return! importWholeMessage template (model, None) next ctx
+            | Error err -> return! unprocessableEntity (text err) earlyReturn ctx
         }
 
 let gmailApiRoutes =
-    requiresRole Roles.gmailInsert
-    >=> requiresGmail
-    >=> choose
-            [ route "/api/gmail/messages/import/ez" >=> gmailImportHandlerSimple
-              route "/api/gmail/messages/import" >=> gmailImportHandler ]
+    choose
+        [ route "/api/gmail/messages/import/ez"
+          >=> requiresRole Roles.gmailInsert
+          >=> requiresGmail
+          >=> gmailImportHandlerSimple
+          route "/api/gmail/messages/import"
+          >=> requiresRole Roles.gmailInsert
+          >=> requiresGmail
+          >=> gmailImportHandler ]
 
 let webhookRoutes =
-    requiresImportRole
+    choose [ route "/api/webhook"; route "/go/notify" ]
+    >=> requiresImportRole
     >=> requiresJson
-    >=> choose [ route "/api/webhook"; route "/go/notify" ]
-    >=> genericJsonHandler "Liquid.Webhook.liquid"
+    >=> genericJsonHandler Webhook
 
 let appriseRoutes =
-    requiresImportRole
+    route "/apprise"
+    >=> requiresImportRole
     >=> requiresJson
-    >=> route "/apprise"
-    >=> genericJsonHandler "Liquid.Apprise.liquid"
+    >=> genericJsonHandler Apprise
 
 let ntfyRoutes =
-    requiresImportRole
-    >=> choose
-            [ routex "^/ntfy/?$" >=> ntfyHandler None
-              routexp "^/ntfy_template/([^/]+)/?$" (fun capture ->
-                  let template = Seq.item 1 capture
-                  ntfyHandler (Some template)) ]
+    let jsonHandler = requiresImportRole >=> requiresJson >=> ntfyJsonHandler None
+
+    let jsonHandlerWithTemplate =
+        fun template -> requiresImportRole >=> requiresJson >=> ntfyJsonHandler (Some template)
+
+    let simpleHandler = fun topic -> requiresImportRole >=> ntfySimpleHandler None topic
+
+    let simpleHandlerWithTemplate =
+        fun (template, topic) -> requiresImportRole >=> ntfySimpleHandler (Some template) topic
+
+    choose
+        [ route "/ntfy" >=> jsonHandler
+          route "/ntfy/" >=> jsonHandler
+          routef "/ntfy_template/%s" jsonHandlerWithTemplate
+          routef "/ntfy_template/%s/" jsonHandlerWithTemplate
+          routef "/ntfy/%s" simpleHandler
+          routef "/ntfy_template/%s/%s" simpleHandlerWithTemplate ]
 
 let shoutrrrRoutes =
-    requiresImportRole
-    >=> choose
-            [ route "/shoutrrr" >=> shoutrrrHandler
-              route "/shoutrrr/json"
-              >=> requiresJson
-              >=> genericJsonHandler "Liquid.Webhook.liquid" ]
+    choose
+        [ route "/shoutrrr" >=> requiresImportRole >=> shoutrrrHandler
+          route "/shoutrrr/json"
+          >=> requiresImportRole
+          >=> requiresJson
+          >=> genericJsonHandler Webhook ]
 
 let webApp =
     choose
