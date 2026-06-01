@@ -1,6 +1,5 @@
 module ForTheRecord.Helpers
 
-open System
 open System.IO
 open System.Net.Http
 open System.Reflection
