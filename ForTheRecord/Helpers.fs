@@ -9,7 +9,6 @@ open System.Text.Json
 /// HTTP client singleton for making requests not connected to the web server.
 let httpClient =
     let client = new HttpClient()
-    client.BaseAddress <- Uri "https://ntfy.sh"
 
     client.DefaultRequestHeaders.UserAgent.TryParseAdd
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 Edg/147.0.0.0"
