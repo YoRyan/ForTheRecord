@@ -231,7 +231,7 @@ let private importWholeMessage (template: string) (model: obj, modelKey: string 
                 failwithf "Failed to parse template: %s" error
 
             let ftr =
-                seq<string * obj> {
+                seq {
                     "user", authenticatedUser ctx |> Option.defaultValue null :> obj
                     "is_gmail", config.Inbox.IsGmail
                     "is_imap", config.Inbox.IsImap
@@ -243,7 +243,7 @@ let private importWholeMessage (template: string) (model: obj, modelKey: string 
 
             let context =
                 TemplateContext(
-                    seq<string * obj> {
+                    seq {
                         match tryDowncast<IDictionary<string, obj>> model with
                         | Some d -> yield! d |> Seq.map (|KeyValue|)
                         | None -> ()
