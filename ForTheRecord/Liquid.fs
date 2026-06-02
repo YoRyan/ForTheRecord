@@ -154,10 +154,30 @@ let rec jsonLiquidModel (js: JsonElement) : obj =
     | JsonValueKind.Null
     | _ -> null
 
-let private parseNtfyTags (v: string) = v |> _.Split(",") |> List.ofArray
+let private parseNtfyPriority (v: string) =
+    v
+    |> _.Trim()
+    |> _.ToLowerInvariant()
+    |> function
+        | "5"
+        | "max"
+        | "urgent" -> 5
+        | "4"
+        | "high" -> 4
+        | "2"
+        | "low" -> 2
+        | "1"
+        | "min" -> 1
+        | "3"
+        | "default"
+        | _ -> 3
+
+let private parseNtfyTags (v: string) =
+    v |> _.Split(",") |> List.ofArray |> List.map _.Trim()
 
 let private parseNtfyBool (v: string) =
     v
+    |> _.Trim()
     |> _.ToLowerInvariant()
     |> function
         | "true"
@@ -165,9 +185,13 @@ let private parseNtfyBool (v: string) =
         | "yes" -> true
         | _ -> false
 
-/// A string value in the [name=]value format. This is used to communicate
-/// notification actions in headers and query strings.
+/// A string value, with an optional name, in the [name=]value format.
 type private NtfySimpleValue = string option * string
+
+/// A value or ; separator token. These are strung together to define actions.
+type private NtfySimpleWord =
+    | Value of NtfySimpleValue
+    | Separator
 
 let private parseNtfyActions (v: string) =
     /// Read a sequence of values in the extras.\<param\>= and
@@ -182,7 +206,7 @@ let private parseNtfyActions (v: string) =
 
     /// Parse an action from the "simple" non-JSON format for use in headers and
     /// query strings.
-    let oneSimpleAction (values: NtfySimpleValue list) : IDictionary<string, obj> option =
+    let oneAction (values: NtfySimpleValue list) : IDictionary<string, obj> option =
         // Despite the name, there is nothing "simple" about this format. We
         // have to account for both the short and long versions and we have to
         // coerce values into maps and booleans where required.
@@ -256,30 +280,46 @@ let private parseNtfyActions (v: string) =
         | _ -> Seq.empty
         |> tryNonEmptyDict
 
-    let asSimple (v: string) =
-        v
-        |> _.Split(";")
-        |> Seq.ofArray
-        |> Seq.map _.Trim()
-        |> Seq.map (fun action ->
-            action
-            |> _.Split(",")
-            |> Seq.ofArray
-            |> Seq.map _.Trim()
-            // Parse each ;-separated action into a sequence of values, which
-            // can be either singleton strings or name-value pairs.
-            |> Seq.map (fun value ->
-                let m = Regex.Matches(value, @"^(?:([\w.]+)=)?(?:'([^']*)'|""([^""]*)""|(.*))$")
+    let rec readWords (v: string) =
+        match v with
+        | "" -> []
+        | _ ->
+            let groups =
+                Regex.Match(
+                    v,
+                    @"^\s*(?:(?<name>[\w.]+)=)?(?:'(?<value>[^']*)'|""(?<value>[^""]*)""|(?<value>[^,;]*))\s*(?<term>,|;|$)(?<rest>.*)"
+                )
+                |> _.Groups
 
-                match m.Count with
-                | 2 -> None, m[1].Value
-                | 3 ->
-                    let name = m[1].Value
-                    (if String.IsNullOrEmpty name then None else Some name), m[2].Value
-                | _ -> None, value)
-            |> List.ofSeq)
-        |> Seq.choose oneSimpleAction
-        |> List.ofSeq
+            let name =
+                groups.TryGetValue "name"
+                |> tryGetByref
+                |> Option.map _.Value
+                |> Option.filter (not << String.IsNullOrEmpty)
+
+            let value = groups["value"].Value
+            let term = groups["term"].Value
+            let rest = groups["rest"].Value
+
+            [ Value(name, value)
+              if term = ";" then
+                  Separator ]
+            @ readWords rest
+
+    let asSimple (v: string) =
+        ([], readWords v)
+        // Split the list of words into sub-lists divided by ; separators.
+        ||> List.fold (fun accum word ->
+            let headAction, tailActions =
+                match accum with
+                | [] -> [], []
+                | h :: t -> h, t
+
+            match word with
+            | Value value -> [ headAction @ [ value ] ] @ tailActions
+            | Separator -> [ [] ] @ [ headAction ] @ tailActions)
+        |> List.rev
+        |> List.choose oneAction
 
     // Per the Ntfy spec, the actions field can be a straight-up JSON array, so
     // try parsing it as one first.
@@ -318,7 +358,7 @@ let ntfyModelFromRequest (request: HttpRequest) : IDictionary<string, obj> =
         | "x-priority"
         | "priority"
         | "prio"
-        | "p" -> Some("priority", int value)
+        | "p" -> Some("priority", parseNtfyPriority value)
         | "x-tags"
         | "tags"
         | "tag"

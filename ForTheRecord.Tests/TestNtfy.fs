@@ -412,3 +412,268 @@ let ``Ntfy JSON import handles missing template`` () =
 
     let response = testRequest config request
     Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode)
+
+[<Fact>]
+let ``Ntfy simple import example 1`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+    request.Content <- makeTextContent "Backup successful 😀"
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    let body = called.Message.HtmlBody
+    Assert.Contains("Backup successful &#128512;", body)
+
+[<Fact>]
+let ``Ntfy simple import example 2`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+    request.Headers.Add("Title", "Unauthorized access detected")
+    request.Headers.Add("Priority", "urgent")
+    request.Headers.Add("Tags", "warning,skull")
+    request.Content <- makeTextContent "Remote access to phils-laptop detected. Act right away."
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Contains("Unauthorized access detected", called.Message.Subject)
+    Assert.Contains("⚠️", called.Message.Subject)
+    Assert.Contains("💀️", called.Message.Subject)
+
+    Assert.Equivalent(
+        seq {
+            "STARRED"
+            "IMPORTANT"
+            "INBOX"
+        }
+        |> Set.ofSeq,
+        called.LabelIds.Value
+    )
+
+    let body = called.Message.HtmlBody
+    Assert.Contains("Remote access to phils-laptop detected. Act right away", body)
+
+[<Fact>]
+let ``Ntfy simple import example 3`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+    request.Headers.Add("Click", "https://home.nest.com/")
+    request.Headers.Add("Attach", "https://nest.com/view/yAxkasd.jpg")
+    request.Headers.Add("Actions", "http, Open door, https://api.nest.com/open/yAxkasd, clear=true")
+
+    request.Content <-
+        makeTextContent
+            "There's someone at the door. 🐶\n\nPlease check if it's a good boy or a hooman.\nDoggies have been known to ring the doorbell."
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equivalent(seq { "INBOX" } |> Set.ofSeq, called.LabelIds.Value)
+
+    let body = called.Message.HtmlBody
+    Assert.Contains("There&#39;s someone at the door. &#128054;", body)
+    Assert.Contains("Please check if it&#39;s a good boy or a hooman.", body)
+    Assert.Contains("Doggies have been known to ring the doorbell.", body)
+
+[<Fact>]
+let ``Ntfy simple import works with markdown`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+    request.Headers.Add("Markdown", "yes")
+    request.Content <- makeTextContent "Look ma, **bold text**, *italics*"
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Equivalent(seq { "INBOX" } |> Set.ofSeq, called.LabelIds.Value)
+
+    let body = called.Message.HtmlBody
+    Assert.Contains("Look ma, <strong>bold text</strong>, <em>italics</em>", body)
+
+[<Fact>]
+let ``Ntfy simple import handles view action button`` () =
+    let config, mock = mockGmailWithoutAuth ()
+
+    let request: HttpRequestMessage =
+        new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+
+    request.Headers.Add("Actions", "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392")
+    request.Content <- makeTextContent "Somebody retweeted your tweet."
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    let body = called.Message.HtmlBody
+    Assert.Contains("Somebody retweeted your tweet.", body)
+    Assert.Contains("Open Twitter", body)
+    Assert.Contains("href=\"https://twitter.com/binwiederhier/status/1467633927951163392\"", body)
+
+[<Fact>]
+let ``Ntfy simple import handles http action button`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+
+    request.Headers.Add(
+        "Actions",
+        "http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}"
+    )
+
+    request.Content <- makeTextContent "Garage door has been open for 15 minutes. Close it?"
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    let body = called.Message.HtmlBody
+    Assert.Contains("Close door", body)
+    Assert.Contains("curl", body)
+    Assert.Contains("PUT", body)
+    Assert.Contains("https://api.mygarage.lan/", body)
+    Assert.Contains("Authorization: Bearer zAzsx1sk..", body)
+    Assert.Contains("{\"action\": \"close\"}", body)
+    Assert.Contains("Garage door has been open for 15 minutes. Close it?", body)
+
+[<Fact>]
+let ``Ntfy simple import handles http copy button`` () =
+    let config, mock = mockGmailWithoutAuth ()
+
+    let request: HttpRequestMessage =
+        new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+
+    request.Headers.Add("Actions", "copy, Copy code, 123456")
+    request.Content <- makeTextContent "Your one-time passcode is 123456"
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    let body = called.Message.HtmlBody
+    Assert.Contains("Copy code", body)
+    Assert.Contains("123456", body)
+    Assert.Contains("Your one-time passcode is 123456", body)
+
+[<Fact>]
+let ``Ntfy simple import handles multiple actions`` () =
+    let config, mock = mockGmailWithoutAuth ()
+
+    let request: HttpRequestMessage =
+        new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+
+    request.Headers.Add(
+        "Actions",
+        "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'"
+    )
+
+    request.Content <- makeTextContent "You left the house. Turn down the A/C?"
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    let body = called.Message.HtmlBody
+    Assert.Contains("Open portal", body)
+    Assert.Contains("href=\"https://home.nest.com/\"", body)
+    Assert.Contains("Turn down", body)
+    Assert.Contains("https://api.nest.com/", body)
+    Assert.Contains("{\"temperature\": 65}", body)
+
+[<Fact>]
+let ``Ntfy simple import handles action with long format`` () =
+    let config, mock = mockGmailWithoutAuth ()
+
+    let request: HttpRequestMessage =
+        new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+
+    request.Headers.Add(
+        "Actions",
+        "action=view, label=Open Twitter, url=https://twitter.com/binwiederhier/status/1467633927951163392"
+    )
+
+    request.Content <- makeTextContent "Somebody retweeted your tweet."
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    let body = called.Message.HtmlBody
+    Assert.Contains("Somebody retweeted your tweet.", body)
+    Assert.Contains("Open Twitter", body)
+    Assert.Contains("href=\"https://twitter.com/binwiederhier/status/1467633927951163392\"", body)
+
+[<Theory>]
+[<InlineData(",")>]
+[<InlineData(";")>]
+let ``Ntfy simple import handles action with separator character inside value`` (sep: string) =
+    let config, mock = mockGmailWithoutAuth ()
+
+    let request: HttpRequestMessage =
+        new HttpRequestMessage(HttpMethod.Post, "/ntfy/INBOX")
+
+    request.Headers.Add(
+        "Actions",
+        $"action=view, label=\"Open {sep} Twitter\", url=https://twitter.com/binwiederhier/status/1467633927951163392"
+    )
+
+    request.Content <- makeTextContent "Somebody retweeted your tweet."
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    let body = called.Message.HtmlBody
+    Assert.Contains("Somebody retweeted your tweet.", body)
+    Assert.Contains($"Open {sep} Twitter", body)
+    Assert.Contains("href=\"https://twitter.com/binwiederhier/status/1467633927951163392\"", body)
+
+[<Fact>]
+let ``Ntfy simple import handles custom template`` () =
+    let mock = MockGmailInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpUrls = None
+          Templates =
+            Map(
+                seq {
+                    "test",
+                    """From: me
+To: me
+Subject: Test Subject
+
+Here's my amazing message: {{ message }}
+"""
+                }
+            )
+          Inbox = Gmail(Set.empty, mock) }
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy_template/test/INBOX")
+    request.Content <- makeTextContent "Hello, World!"
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+    Assert.Contains("Test Subject", called.Message.Subject)
+
+    let body =
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+
+    Assert.Contains("Here's my amazing message: Hello, World!", body)
+
+[<Fact>]
+let ``Ntfy simple import handles missing template`` () =
+    let config, mock = mockGmailWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy_template/test/INBOX")
+    request.Content <- makeTextContent "Hello, World!"
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode)
