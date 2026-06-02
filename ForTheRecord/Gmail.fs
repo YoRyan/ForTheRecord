@@ -82,8 +82,6 @@ type IGmailInbox =
         ?deleted: bool ->
             Task<unit>
 
-    abstract member Send: message: Stream -> Task<unit>
-
 type GmailInbox(service: GmailService) =
     interface IGmailInbox with
         member _.Import
@@ -116,8 +114,6 @@ type GmailInbox(service: GmailService) =
                 let! _ = request.ExecuteAsync()
                 return ()
             }
-
-        member _.Send(message: Stream) : Task<unit> = failwith "Not Implemented"
 
 /// Import a finalized message to Gmail, using special headers to determine
 /// which Gmail flags and metadata to apply.
