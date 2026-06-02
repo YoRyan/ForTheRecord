@@ -26,6 +26,10 @@ type ServeConfig =
       Templates: Map<string, string>
       Inbox: ConfiguredInbox }
 
+// We use DOM access because F# records do not serialize well without the
+// CLIMutable attribute. This requires named record types, which would mean a
+// lot of ceremony.
+
 let private inTable<'T> k (t: TomlTable) =
     t.TryGetValue k |> tryGetByref |> Option.bind tryDowncast<'T>
 
@@ -38,6 +42,16 @@ let private asMap<'V> (t: TomlTable) : Map<string, 'V> =
     |> Seq.map (|KeyValue|)
     |> Seq.choose (fun (k, v) -> v |> tryDowncast<'V> |> Option.map (fun cast -> k, cast))
     |> Map.ofSeq
+
+let getGmailInbox (config: ServeConfig) =
+    match config.Inbox with
+    | Gmail(_authInsert, inbox) -> inbox
+    | _ -> raise (InvalidOperationException())
+
+let getImapInbox (config: ServeConfig) =
+    match config.Inbox with
+    | Imap(_authAppend, inbox) -> inbox
+    | _ -> raise (InvalidOperationException())
 
 let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: TomlTable) =
     task {
@@ -57,7 +71,7 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
 let loadGmailConfig (t: TomlTable) =
     task {
         let google = t |> inTable "google"
-        let googleScopes = google |> Option.bind (inTable "scopes")
+        let scopes = google |> Option.bind (inTable "scopes")
 
         let credentialsFile =
             match google |> Option.bind (inTable "credentials") with
@@ -76,7 +90,7 @@ let loadGmailConfig (t: TomlTable) =
         let service = new GmailService(initializer)
 
         let authInsert =
-            googleScopes
+            scopes
             |> Option.bind (inTable "gmail")
             |> Option.bind (inTable "insert")
             |> Option.map asList
@@ -85,16 +99,6 @@ let loadGmailConfig (t: TomlTable) =
 
         return Gmail(authInsert, GmailInbox service)
     }
-
-let getGmailInbox (config: ServeConfig) =
-    match config.Inbox with
-    | Gmail(_authInsert, inbox) -> inbox
-    | _ -> raise (InvalidOperationException())
-
-let getImapInbox (config: ServeConfig) =
-    match config.Inbox with
-    | Imap(_authAppend, inbox) -> inbox
-    | _ -> raise (InvalidOperationException())
 
 let testGmail (t: TomlTable) =
     task {
@@ -118,5 +122,48 @@ let testGmail (t: TomlTable) =
         new GmailService(initializer) |> ignore
 
         printfn "Successfully logged into Gmail."
-        return ()
+    }
+
+let loadImapConfig (t: TomlTable) =
+    let imap = t |> inTable "imap"
+    let perms = imap |> Option.bind (inTable "permissions")
+
+    let uri =
+        match imap |> Option.bind (inTable "uri") with
+        | Some uri -> Uri uri
+        | None -> failwith "Missing imap:// or imaps:// connection URL."
+
+    let username, password =
+        match imap |> Option.bind (inTable "username"), imap |> Option.bind (inTable "password") with
+        | Some username, Some password -> username, password
+        | _ -> failwith "Missing IMAP username and password."
+
+    let authAppend =
+        perms
+        |> Option.bind (inTable "append")
+        |> Option.map asList
+        |> Option.defaultValue []
+        |> Set.ofList
+
+    Imap(authAppend, new ImapInbox(uri, username, password)) |> Task.FromResult
+
+let testImap (t: TomlTable) =
+    task {
+        let imap = t |> inTable "imap"
+
+        let uri =
+            match imap |> Option.bind (inTable "uri") with
+            | Some uri -> Uri uri
+            | None -> failwith "Missing imap:// or imaps:// connection URL."
+
+        let username, (password: string) =
+            match imap |> Option.bind (inTable "username"), imap |> Option.bind (inTable "password") with
+            | Some username, Some password -> username, password
+            | _ -> failwith "Missing IMAP username and password."
+
+        use client = new MailKit.Net.Imap.ImapClient()
+        do! client.ConnectAsync uri
+        do! client.AuthenticateAsync(username, password)
+
+        printfn "Successfully logged into IMAP server."
     }

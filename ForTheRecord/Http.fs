@@ -21,6 +21,7 @@ open MimeKit
 open ForTheRecord.Config
 open ForTheRecord.Gmail
 open ForTheRecord.Helpers
+open ForTheRecord.Imap
 open ForTheRecord.Liquid
 
 module private Realms =
@@ -264,7 +265,7 @@ let private importWholeMessage (template: string) (model: obj, modelKey: string 
             do!
                 match config.Inbox with
                 | Gmail(_, inbox) -> importWholeMessageToGmail inbox stream
-                | Imap(_, inbox) -> failwith "Not Implemented"
+                | Imap(_, inbox) -> importWholeMessageToImap inbox stream
 
             return Some ctx
         })

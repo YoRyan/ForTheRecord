@@ -13,6 +13,7 @@ open Meziantou.Framework.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Hosting
+open MailKit
 open MimeKit
 open Xunit
 
@@ -39,7 +40,7 @@ type MockGmailInbox() =
                 ?neverMarkSpam: bool,
                 ?processForCalendar: bool,
                 ?deleted: bool
-            ) : Task<unit> =
+            ) =
             this.CalledImport <-
                 Some
                     {| Message = MimeMessage.Load message
@@ -51,12 +52,26 @@ type MockGmailInbox() =
 
             Task.FromResult()
 
-        member this.Send(message: Stream) : Task<unit> = failwith "Not Implemented"
-
 type MockImapInbox() =
+    member val CalledAppends: {| Message: MimeMessage
+                                 Folder: string option
+                                 Flags: MessageFlags option
+                                 Keywords: string list option
+                                 Date: DateTime option |} list = [] with get, set
+
     interface IImapInbox with
-        member this.Append(message: Stream, flag: string list option, date: DateTime option) : Task<unit> =
-            failwith "Not Implemented"
+        member this.Append
+            (message: MimeMessage, ?folder: string, ?flags: MessageFlags, ?keywords: string list, ?date: DateTime)
+            =
+            this.CalledAppends <-
+                this.CalledAppends
+                @ [ {| Message = message
+                       Folder = folder
+                       Flags = flags
+                       Keywords = keywords
+                       Date = date |} ]
+
+            Task.FromResult()
 
 let getTestApp (config: ServeConfig) =
     let builder = WebApplication.CreateBuilder()
@@ -100,6 +115,17 @@ let mockGmailWithHunter2Auth (user: string) (hasInsert: bool) =
           HttpUrls = None
           Templates = Map.empty
           Inbox = Gmail(authSet hasInsert, mock) }
+
+    config, mock
+
+let mockImapWithoutAuth () =
+    let mock = MockImapInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpUrls = None
+          Templates = Map.empty
+          Inbox = Imap(Set.empty, mock) }
 
     config, mock
 

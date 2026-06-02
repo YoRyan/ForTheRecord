@@ -1,26 +1,28 @@
 ﻿open System.IO
 open System.Threading.Tasks
 
-open Tomlyn
 open Tomlyn.Model
 
 open ForTheRecord.Config
 open ForTheRecord.Http
 
-let doTestGmail (configFile: FileInfo) =
+let runWithConfig (fn: TomlTable -> Task<unit>) (file: FileInfo) : Task =
     task {
-        use configFile = configFile.OpenRead()
-        let config = TomlSerializer.Deserialize<TomlTable> configFile
-        return! testGmail config
+        use file = file.OpenRead()
+        let config = Tomlyn.TomlSerializer.Deserialize<TomlTable> file
+        do! fn config
     }
 
-let doServeGmail (configFile: FileInfo) =
+let serveGmail (config: TomlTable) =
     task {
-        use configFile = configFile.OpenRead()
-        let config = TomlSerializer.Deserialize<TomlTable> configFile
-        let! config = loadServeConfig loadGmailConfig config
+        let! serveConfig = loadServeConfig loadGmailConfig config
+        return! serveHttpAsync serveConfig
+    }
 
-        do! serveHttpAsync config
+let serveImap (config: TomlTable) =
+    task {
+        let! serveConfig = loadServeConfig loadImapConfig config
+        return! serveHttpAsync serveConfig
     }
 
 [<EntryPoint>]
@@ -36,22 +38,42 @@ let main arg =
 
         root.Add config
 
-        let testGmail =
-            System.CommandLine.Command(
-                "test-gmail",
-                "Test the connection to Gmail, obtaining tokens from Google if necessary"
-            )
+        root.Subcommands.Add(
+            let cmd =
+                System.CommandLine.Command(
+                    "test-gmail",
+                    "Test the connection to Gmail, obtaining tokens from Google if necessary"
+                )
 
-        testGmail.SetAction(fun result -> (doTestGmail (result.GetRequiredValue config): Task))
-        root.Subcommands.Add testGmail
+            cmd.SetAction(fun result -> runWithConfig testGmail (result.GetRequiredValue config))
+            cmd
+        )
 
-        let serveGmail =
-            System.CommandLine.Command("serve-gmail", "Run the service using the configured Gmail inbox")
+        root.Subcommands.Add(
+            let cmd =
+                System.CommandLine.Command("serve-gmail", "Run the service using the configured Gmail inbox")
 
-        serveGmail.SetAction(fun result -> (doServeGmail (result.GetRequiredValue config): Task))
-        root.Subcommands.Add serveGmail
+            cmd.SetAction(fun result -> runWithConfig serveGmail (result.GetRequiredValue config))
+            cmd
+        )
 
-        return (root.Parse arg).Invoke()
+        root.Subcommands.Add(
+            let cmd =
+                System.CommandLine.Command("test-imap", "Test the connection to the configured IMAP server")
+
+            cmd.SetAction(fun result -> runWithConfig testImap (result.GetRequiredValue config))
+            cmd
+        )
+
+        root.Subcommands.Add(
+            let cmd =
+                System.CommandLine.Command("serve-imap", "Run the service using the configured IMAP inbox")
+
+            cmd.SetAction(fun result -> runWithConfig serveImap (result.GetRequiredValue config))
+            cmd
+        )
+
+        return arg |> root.Parse |> _.Invoke()
     }
     |> Async.AwaitTask
     |> Async.RunSynchronously
