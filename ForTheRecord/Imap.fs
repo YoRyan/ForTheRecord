@@ -57,7 +57,7 @@ type ImapInbox(uri: Uri, username: string, password: string) =
                 clientSem.Release() |> ignore
             }
 
-let parseImapFlags (flags: string list) : MessageFlags =
+let parseImapFlags (flags: string list) =
     let enums =
         flags
         |> Seq.map _.ToLowerInvariant()
@@ -71,9 +71,7 @@ let parseImapFlags (flags: string list) : MessageFlags =
             | "userdefined" -> Some MessageFlags.UserDefined
             | _ -> None)
 
-    (0, enums)
-    ||> Seq.fold (fun accum flag -> accum ||| int flag)
-    |> LanguagePrimitives.EnumOfValue
+    (MessageFlags.None, enums) ||> Seq.fold (fun accum flag -> accum ||| flag)
 
 /// Import a finalized message to Imap, using special headers to determine
 /// which flags and metadata to apply.
