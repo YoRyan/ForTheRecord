@@ -4,6 +4,7 @@ open System.Net
 open System.Net.Http
 open System.Text
 
+open MailKit
 open Xunit
 
 open ForTheRecord.Config
@@ -37,6 +38,31 @@ let ``JSON import requires Json request content`` (uri: string) =
 [<InlineData("/ntfy_template/test")>]
 let ``JSON import requires Gmail insert scope when Gmail is configured`` (uri: string) =
     let config, _ = mockGmailWithHunter2Auth "AzureDiamond" false
+    let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
+
+    let request = new HttpRequestMessage(HttpMethod.Post, uri)
+    request.Headers.Authorization <- authHeader
+
+    use content =
+        {| title = "Title"
+           message = "Whatever"
+           ``type`` = "info" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode)
+
+[<Theory>]
+[<InlineData("/api/webhook")>]
+[<InlineData("/go/notify")>]
+[<InlineData("/apprise")>]
+[<InlineData("/shoutrrr/json")>]
+[<InlineData("/ntfy")>]
+[<InlineData("/ntfy_template/test")>]
+let ``JSON import requires IMAP insert scope when IMAP is configured`` (uri: string) =
+    let config, _ = mockImapWithHunter2Auth "AzureDiamond" false
     let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
 
     let request = new HttpRequestMessage(HttpMethod.Post, uri)
@@ -181,6 +207,52 @@ Subject: Test Subject
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
+    Assert.Equal("Test Subject", called.Message.Subject)
+
+    let body =
+        called.Message.BodyParts
+        |> Seq.exactlyOne
+        |> readEntity
+        |> Encoding.UTF8.GetString
+
+    Assert.Contains("Hello, World!", body)
+
+[<Fact>]
+let ``JSON import handles reference to imap`` () =
+    let mock = MockImapInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpUrls = None
+          Templates =
+            Map(
+                seq {
+                    "test",
+                    """From: me
+To: me
+Subject: Test Subject
+
+{% if ftr.is_imap -%}
+{{ message }}
+{% endif -%}
+"""
+                }
+            )
+          Inbox = Imap(Set.empty, mock) }
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| message = "Hello, World!"
+           ftr_template = "test" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
     Assert.Equal("Test Subject", called.Message.Subject)
 
     let body =
@@ -365,6 +437,36 @@ let ``Webhook import sets Gmail important label and custom label`` () =
         called.LabelIds.Value
     )
 
+[<Fact>]
+let ``Webhook import sets IMAP flags`` () =
+    let config, mock = mockImapWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/webhook")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           imap_folders = "Inbox,CustomFolder,OtherCustomFolder"
+           imap_flags = "seen,answered"
+           imap_keywords = "keyword1,keyword2" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    Assert.Equivalent(
+        [ "Inbox"; "CustomFolder"; "OtherCustomFolder" ] |> Set,
+        mock.CalledAppends |> List.choose (fun call -> call.Folder) |> Set
+    )
+
+    for called in mock.CalledAppends do
+        Assert.Equivalent(Some(MessageFlags.Seen ||| MessageFlags.Answered), called.Flags)
+
+        Assert.Equivalent(
+            [ "keyword1"; "keyword2" ] |> Set,
+            called.Keywords |> Option.map Set |> Option.defaultValue Set.empty
+        )
 
 /// https://github.com/nikoksr/notify/tree/main/service/http
 [<Fact>]

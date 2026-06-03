@@ -4,6 +4,7 @@ open System.Net
 open System.Net.Http
 open System.Text
 
+open MailKit
 open Xunit
 
 open ForTheRecord.Config
@@ -200,6 +201,124 @@ let ``Ntfy JSON import removes Gmail INBOX label for low priority`` (priority: u
 
     let called = mock.CalledImport.Value
     Assert.Equivalent(Set.empty, called.LabelIds.Value)
+
+    let body = called.Message.HtmlBody
+    Assert.Contains("Whatever", body)
+
+[<Fact>]
+let ``Ntfy JSON import sets IMAP recent and flagged flag for priority 5`` () =
+    let config, mock = mockImapWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy")
+
+    use content =
+        {| topic = "Inbox"
+           message = "Whatever"
+           priority = 5
+           filename = "diskspace.jpg" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equivalent(Some(MessageFlags.Recent ||| MessageFlags.Flagged), called.Flags)
+
+    let body = called.Message.HtmlBody
+    Assert.Contains("Whatever", body)
+
+[<Fact>]
+let ``Ntfy JSON import sets IMAP recent flag for priority 4`` () =
+    let config, mock = mockImapWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy")
+
+    use content =
+        {| topic = "Inbox"
+           message = "Whatever"
+           priority = 4
+           filename = "diskspace.jpg" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equivalent(Some MessageFlags.Recent, called.Flags)
+
+    let body = called.Message.HtmlBody
+    Assert.Contains("Whatever", body)
+
+[<Fact>]
+let ``Ntfy JSON import sets no IMAP flags for priority 3`` () =
+    let config, mock = mockImapWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy")
+
+    use content =
+        {| topic = "Inbox"
+           message = "Whatever"
+           priority = 3
+           filename = "diskspace.jpg" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equivalent(None, called.Flags)
+
+    let body = called.Message.HtmlBody
+    Assert.Contains("Whatever", body)
+
+[<Theory>]
+[<InlineData(2)>]
+[<InlineData(1)>]
+let ``Ntfy JSON import sets IMAP answered flag for low priority`` (priority: uint) =
+    let config, mock = mockImapWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy")
+
+    use content =
+        {| topic = "Inbox"
+           message = "Whatever"
+           priority = priority
+           filename = "diskspace.jpg" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equivalent(Some MessageFlags.Answered, called.Flags)
+
+    let body = called.Message.HtmlBody
+    Assert.Contains("Whatever", body)
+
+[<Fact>]
+let ``Ntfy JSON import sets IMAP keywords`` () =
+    let config, mock = mockImapWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy")
+
+    use content =
+        {| topic = "Inbox"
+           message = "Whatever"
+           priority = 3
+           filename = "diskspace.jpg"
+           tags = [ "warning"; "cd" ] |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equivalent([ "warning"; "cd" ] |> Set |> Some, called.Keywords |> Option.map Set)
 
     let body = called.Message.HtmlBody
     Assert.Contains("Whatever", body)

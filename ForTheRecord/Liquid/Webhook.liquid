@@ -19,6 +19,18 @@ X-FTR-Gmail-ProcessForCalendar: {{ gmail_process_for_calendar }}
 {% if gmail_deleted -%}
 X-FTR-Gmail-Deleted: {{ gmail_deleted }}
 {% endif -%}
+{% assign imap_folders = imap_folders | split: "," -%}
+{% for folder in imap_folders -%}
+X-FTR-Imap-Folder: {{ folder }}
+{% endfor -%}
+{% assign imap_flags = imap_flags | split: "," -%}
+{% for flag in imap_flags -%}
+X-FTR-Imap-Flag: {{ flag }}
+{% endfor -%}
+{% assign imap_keywords = imap_keywords | split: "," -%}
+{% for keyword in imap_keywords -%}
+X-FTR-Imap-Keyword: {{ keyword }}
+{% endfor -%}
 {% if subject %}{% assign title = subject %}{% endif -%}
 Subject: {{ title | ftr_encode_utf8 }}
 Content-Type: {{ content_type | default: "text/plain" }}

@@ -5,6 +5,7 @@ open System.Net
 open System.Net.Http
 open System.Text
 
+open MailKit
 open MimeKit
 open Xunit
 
@@ -307,3 +308,35 @@ let ``Apprise import sets Gmail important label and custom label`` () =
         |> Set.ofSeq,
         called.LabelIds.Value
     )
+
+[<Fact>]
+let ``Apprise import sets IMAP flags`` () =
+    let config, mock = mockImapWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/apprise")
+
+    use content =
+        {| title = "Test Title"
+           message = "Test Message"
+           ``type`` = "info"
+           imap_folders = "Inbox,CustomFolder,OtherCustomFolder"
+           imap_flags = "seen,answered"
+           imap_keywords = "keyword1,keyword2" |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    Assert.Equivalent(
+        [ "Inbox"; "CustomFolder"; "OtherCustomFolder" ] |> Set,
+        mock.CalledAppends |> List.choose (fun call -> call.Folder) |> Set
+    )
+
+    for called in mock.CalledAppends do
+        Assert.Equivalent(Some(MessageFlags.Seen ||| MessageFlags.Answered), called.Flags)
+
+        Assert.Equivalent(
+            [ "keyword1"; "keyword2" ] |> Set,
+            called.Keywords |> Option.map Set |> Option.defaultValue Set.empty
+        )
