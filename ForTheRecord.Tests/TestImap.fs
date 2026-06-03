@@ -1,15 +1,370 @@
 module Tests.Imap
 
+open System
+open System.Collections.Generic
 open System.IO
+open System.Net
+open System.Net.Http
 open System.Text
 
 open MailKit
 open MimeKit.Text
 open Xunit
 
+open ForTheRecord.Config
 open ForTheRecord.Imap
 
 open Fixtures
+
+[<Theory>]
+[<InlineData("/api/imap/append/ez")>]
+[<InlineData("/api/imap/append")>]
+let ``Endpoints not available when Imap is not configured`` (uri: string) =
+    let mock = MockGmailInbox()
+
+    let config =
+        { Htpasswd = None
+          HttpUrls = None
+          Templates = Map.empty
+          Inbox = Gmail(Set.empty, mock) }
+
+    let request = new HttpRequestMessage(HttpMethod.Post, uri)
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Gone, response.StatusCode)
+
+[<Fact>]
+let ``Authenticated endpoints work when authentication is disabled`` () =
+    let config, _ = mockImapWithoutAuth ()
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/ez")
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    use content = new FormUrlEncodedContent(seq { "body", "" } |> Seq.map KeyValuePair)
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Content <- content
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+[<Fact>]
+let ``Authenticated endpoints require authentication`` () =
+    let config, _ = mockImapWithHunter2Auth "AzureDiamond" true
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/ez")
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode)
+
+    use content = new FormUrlEncodedContent(seq { "body", "" } |> Seq.map KeyValuePair)
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Content <- content
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode)
+
+[<Fact>]
+let ``Authenticated endpoints work with basic authentication`` () =
+    let config, _ = mockImapWithHunter2Auth "AzureDiamond" true
+    let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/ez")
+
+    request.Headers.Authorization <- authHeader
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    use content = new FormUrlEncodedContent(seq { "body", "" } |> Seq.map KeyValuePair)
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Headers.Authorization <- authHeader
+    request.Content <- content
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+[<Fact>]
+let ``Authenticated endpoints fail with bad authentication`` () =
+    let config, _ = mockImapWithHunter2Auth "AzureDiamond" true
+    let authHeader = makeBasicAuth "AzureDiamond" "whatever"
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/ez")
+
+    request.Headers.Authorization <- authHeader
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode)
+
+    use content = new FormUrlEncodedContent(seq { "body", "" } |> Seq.map KeyValuePair)
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Headers.Authorization <- authHeader
+    request.Content <- content
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode)
+
+[<Fact>]
+let ``Authenticated endpoints require the append scope`` () =
+    let config, _ = mockImapWithHunter2Auth "AzureDiamond" false
+    let authHeader = makeBasicAuth "AzureDiamond" "hunter2"
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/ez")
+
+    request.Headers.Authorization <- authHeader
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode)
+
+    use content = new FormUrlEncodedContent(seq { "body", "" } |> Seq.map KeyValuePair)
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Headers.Authorization <- authHeader
+    request.Content <- content
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode)
+
+[<Fact>]
+let ``Easy curl import works`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    use content =
+        makeTextContent
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/ez")
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+
+    Assert.Equal(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        TextFormat.Text |> called.Message.GetTextBody |> _.Trim()
+    )
+
+    Assert.Equal("text/plain", called.Message.Body.ContentType.MimeType)
+
+[<Fact>]
+let ``Easy curl import passes through headers`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/ez")
+
+    request.Headers.Add("To", "bob@example.com")
+    request.Headers.Add("Subject", "Hello, World!")
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equal("bob@example.com", string called.Message.To)
+    Assert.Equal("Hello, World!", called.Message.Subject)
+
+[<Fact>]
+let ``Easy curl import passes through Content-Type`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/ez")
+
+    request.Headers.Add("To", "bob@example.com")
+
+    use content = makeTextContent "Now we have <strong>HTML</strong>!"
+    content.Headers.ContentType <- Headers.MediaTypeHeaderValue "text/html"
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equal("text/html", called.Message.Body.ContentType.MimeType)
+
+[<Fact>]
+let ``Curl import with application/x-www-form-urlencoded works`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    use content =
+        new FormUrlEncodedContent(
+            seq {
+                "body",
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+
+                "folder", "Inbox"
+                "folder", "CustomFolder"
+                "flag", "seen"
+                "flag", "flagged"
+                "keyword", "keyword1"
+                "keyword", "keyword2"
+            }
+            |> Seq.map KeyValuePair
+        )
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    Assert.Equivalent(
+        [ "Inbox"; "CustomFolder" ] |> Set,
+        mock.CalledAppends |> List.choose (fun call -> call.Folder) |> Set
+    )
+
+    for called in mock.CalledAppends do
+        Assert.Equal(Some(MessageFlags.Seen ||| MessageFlags.Flagged), called.Flags)
+
+        Assert.Equivalent(
+            [ "keyword1"; "keyword2" ] |> Set,
+            called.Keywords |> Option.map Set |> Option.defaultValue Set.empty
+        )
+
+        Assert.Equal(
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            TextFormat.Plain |> called.Message.GetTextBody |> _.Trim()
+        )
+
+[<Fact>]
+let ``Curl import with application/x-www-form-urlencoded works with non-plain body`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    use content =
+        new FormUrlEncodedContent(
+            seq {
+                "body", "Hello, <em>World!</em>"
+                "bodytype", "text/html"
+            }
+            |> Seq.map KeyValuePair
+        )
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equal("Hello, <em>World!</em>", TextFormat.Html |> called.Message.GetTextBody |> _.Trim())
+
+[<Fact>]
+let ``Curl import with multipart/form-data works`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    use content = new MultipartFormDataContent()
+
+    for k, v in
+        seq {
+            "body",
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+
+            "folder", "Inbox"
+            "folder", "CustomFolder"
+            "flag", "seen"
+            "flag", "flagged"
+            "keyword", "keyword1"
+            "keyword", "keyword2"
+        } do
+        content.Add(makeTextContent v, k)
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    Assert.Equivalent(
+        [ "Inbox"; "CustomFolder" ] |> Set,
+        mock.CalledAppends |> List.choose (fun call -> call.Folder) |> Set
+    )
+
+    for called in mock.CalledAppends do
+        Assert.Equal(Some(MessageFlags.Seen ||| MessageFlags.Flagged), called.Flags)
+
+        Assert.Equivalent(
+            [ "keyword1"; "keyword2" ] |> Set,
+            called.Keywords |> Option.map Set |> Option.defaultValue Set.empty
+        )
+
+        Assert.Equal(
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            TextFormat.Plain |> called.Message.GetTextBody |> _.Trim()
+        )
+
+[<Fact>]
+let ``Curl import with multipart/form-data works with attachments`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    use content = new MultipartFormDataContent()
+    content.Add(makeTextContent "Hello, World!", "body")
+    use jsonContent = makeJsonContent {| hello = "world" |}
+    content.Add(jsonContent, "upload", "hello.json")
+    content.Add(makeContent "text/html" "<p>hello <strong>world</strong></p>", "upload2", "hello.html")
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equal("Hello, World!", TextFormat.Plain |> called.Message.GetTextBody |> _.Trim())
+
+    let attachments = called.Message.Attachments |> Seq.toList
+    Assert.Equal(2, attachments.Length)
+    Assert.Equal("application/json", attachments[0].ContentType.MimeType)
+    Assert.Equal("hello.json", attachments[0].ContentType.Name)
+    Assert.Equal("text/html", attachments[1].ContentType.MimeType)
+    Assert.Equal("hello.html", attachments[1].ContentType.Name)
+
+    Assert.Contains(
+        jsonContent
+        |> _.ReadAsStringAsync()
+        |> Async.AwaitTask
+        |> Async.RunSynchronously
+        |> Encoding.UTF8.GetBytes
+        |> Convert.ToBase64String,
+        attachments[0] |> readEntity |> Encoding.UTF8.GetString
+    )
+
+    Assert.Contains(
+        "<p>hello <strong>world</strong></p>"
+        |> Encoding.UTF8.GetBytes
+        |> Convert.ToBase64String,
+        attachments[1] |> readEntity |> Encoding.UTF8.GetString
+    )
+
+[<Fact>]
+let ``Curl import with multipart/form-data works (sort of) with non-plain body`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    use content = new MultipartFormDataContent()
+    content.Add(makeContent "text/html" "Hello, <em>World!</em>", "body")
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    // This would ideally be text/html as originally submitted, but due to
+    // limitations in ASP.NET's form-parsing API, that would require a custom
+    // parser like https://andrewlock.net/reading-json-and-binary-data-from-multipart-form-data-sections-in-aspnetcore/.
+    // Too much work--for now we're not concerned with this niche case.
+    Assert.Equal("Hello, <em>World!</em>", TextFormat.Text |> called.Message.GetTextBody |> _.Trim())
+
+[<Fact>]
+let ``Curl import passes through headers`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    use content = new MultipartFormDataContent()
+    content.Add(makeTextContent "Hello, World!", "body")
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append")
+    request.Content <- content
+    request.Headers.Add("To", "bob@example.com")
+    request.Headers.Add("Subject", "Hello, World!")
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+    Assert.Equal("bob@example.com", string called.Message.To)
+    Assert.Equal("Hello, World!", called.Message.Subject)
 
 [<Fact>]
 let ``Whole message import works`` () =

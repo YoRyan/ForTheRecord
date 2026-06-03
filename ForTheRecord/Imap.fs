@@ -57,7 +57,7 @@ type ImapInbox(uri: Uri, username: string, password: string) =
                 clientSem.Release() |> ignore
             }
 
-let private parseFlags (flags: string list) : MessageFlags =
+let parseImapFlags (flags: string list) : MessageFlags =
     let enums =
         flags
         |> Seq.map _.ToLowerInvariant()
@@ -96,7 +96,7 @@ let importWholeMessageToImap (inbox: IImapInbox) (message: Stream) =
                     state)
 
         let folders = readList "x-ftr-imap-folder"
-        let flags = readList "x-ftr-imap-flag" |> Option.map parseFlags
+        let flags = readList "x-ftr-imap-flag" |> Option.map parseImapFlags
         let keywords = readList "x-ftr-imap-keyword"
 
         match folders with

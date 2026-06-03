@@ -76,7 +76,7 @@ let private mapHeaders (ctx: HttpContext) =
 
     headerList, contentType
 
-let private gmailImportHandlerSimple =
+let private simpleImportHandler =
     handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
@@ -91,24 +91,16 @@ let private gmailImportHandlerSimple =
             body.Content <- new MimeContent(bodyStream)
             message.Body <- body
 
-            use stream = new MemoryStream()
-            do! message.WriteToAsync stream
-            stream.Seek(0, SeekOrigin.Begin) |> ignore
-
-            do! (getGmailInbox config).Import stream
+            match config.Inbox with
+            | Gmail(_authInsert, inbox) ->
+                use stream = new MemoryStream()
+                do! message.WriteToAsync stream
+                stream.Seek(0, SeekOrigin.Begin) |> ignore
+                do! inbox.Import stream
+            | Imap(_authAppend, inbox) -> do! inbox.Append message
 
             return Some ctx
         })
-
-[<CLIMutable>]
-type ImportForm =
-    { LabelId: string list option
-      Body: string option
-      BodyType: string option
-      InternalDateSource: string option
-      NeverMarkSpam: bool option
-      ProcessForCalendar: bool option
-      Deleted: bool option }
 
 let private readAttachment (file: IFormFile) =
     let attach =
@@ -124,11 +116,21 @@ let private readAttachment (file: IFormFile) =
     attach.FileName <- file.FileName
     attach
 
+[<CLIMutable>]
+type GmailImportForm =
+    { LabelId: string list option
+      Body: string option
+      BodyType: string option
+      InternalDateSource: string option
+      NeverMarkSpam: bool option
+      ProcessForCalendar: bool option
+      Deleted: bool option }
+
 let private gmailImportHandler =
     handleContext (fun ctx ->
         task {
             let config = ctx.GetService<ServeConfig>()
-            let! form = ctx.BindFormAsync<ImportForm>()
+            let! form = ctx.BindFormAsync<GmailImportForm>()
             use multipart = new Multipart "mixed"
 
             use body =
@@ -148,7 +150,7 @@ let private gmailImportHandler =
                     body
                     yield! ctx.Request.Form.Files |> Seq.map readAttachment
                 } do
-                multipart.Add(entity)
+                multipart.Add entity
 
             let messageHeaders, _ = mapHeaders ctx
             use message = new MimeMessage(messageHeaders)
@@ -170,6 +172,59 @@ let private gmailImportHandler =
                         ?processForCalendar = form.ProcessForCalendar,
                         ?deleted = form.Deleted
                     )
+
+            return Some ctx
+        })
+
+[<CLIMutable>]
+type ImapAppendForm =
+    { Folder: string list option
+      Flag: string list option
+      Keyword: string list option
+      Body: string option
+      BodyType: string option }
+
+let private imapAppendHandler =
+    handleContext (fun ctx ->
+        task {
+            let config = ctx.GetService<ServeConfig>()
+            let! form = ctx.BindFormAsync<ImapAppendForm>()
+            use multipart = new Multipart "mixed"
+
+            use body =
+                new MimePart(
+                    form.BodyType
+                    |> Option.bind (parseContentType >> Result.toOption)
+                    |> Option.defaultWith (fun () -> ContentType("text", "plain"))
+                )
+
+            use bodyStream =
+                new MemoryStream(form.Body |> Option.defaultValue "" |> Encoding.UTF8.GetBytes)
+
+            body.Content <- new MimeContent(bodyStream)
+
+            for entity in
+                seq {
+                    body
+                    yield! ctx.Request.Form.Files |> Seq.map readAttachment
+                } do
+                multipart.Add entity
+
+            let messageHeaders, _ = mapHeaders ctx
+            use message = new MimeMessage(messageHeaders)
+            message.Body <- multipart
+
+            let inbox = getImapInbox config
+            let flags = Option.map parseImapFlags form.Flag
+
+            match form.Folder with
+            | Some folders ->
+                do!
+                    folders
+                    |> Seq.map (fun f -> inbox.Append(message, f, ?flags = flags, ?keywords = form.Keyword))
+                    |> Seq.cast<Task>
+                    |> Task.WhenAll
+            | None -> do! inbox.Append(message, ?flags = flags, ?keywords = form.Keyword)
 
             return Some ctx
         })
@@ -374,11 +429,22 @@ let gmailApiRoutes =
         [ route "/api/gmail/messages/import/ez"
           >=> requiresRole Roles.gmailInsert
           >=> requiresGmail
-          >=> gmailImportHandlerSimple
+          >=> simpleImportHandler
           route "/api/gmail/messages/import"
           >=> requiresRole Roles.gmailInsert
           >=> requiresGmail
           >=> gmailImportHandler ]
+
+let imapApiRoutes =
+    choose
+        [ route "/api/imap/append/ez"
+          >=> requiresRole Roles.imapAppend
+          >=> requiresImap
+          >=> simpleImportHandler
+          route "/api/imap/append"
+          >=> requiresRole Roles.imapAppend
+          >=> requiresImap
+          >=> imapAppendHandler ]
 
 let webhookRoutes =
     choose [ route "/api/webhook"; route "/go/notify" ]
@@ -422,7 +488,13 @@ let shoutrrrRoutes =
 let webApp =
     choose
         [ POST
-          >=> choose [ gmailApiRoutes; webhookRoutes; appriseRoutes; ntfyRoutes; shoutrrrRoutes ]
+          >=> choose
+                  [ gmailApiRoutes
+                    imapApiRoutes
+                    webhookRoutes
+                    appriseRoutes
+                    ntfyRoutes
+                    shoutrrrRoutes ]
           RequestErrors.NOT_FOUND "404" ]
 
 let private validateCredentials (context: ValidateCredentialsContext) =

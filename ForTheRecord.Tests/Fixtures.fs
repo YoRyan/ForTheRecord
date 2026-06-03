@@ -63,9 +63,15 @@ type MockImapInbox() =
         member this.Append
             (message: MimeMessage, ?folder: string, ?flags: MessageFlags, ?keywords: string list, ?date: DateTime)
             =
+            // Need to copy the original message, which may get disposed.
+            use stream = new MemoryStream()
+            message.WriteTo stream
+            stream.Seek(0, SeekOrigin.Begin) |> ignore
+            let copy = MimeMessage.Load stream
+
             this.CalledAppends <-
                 this.CalledAppends
-                @ [ {| Message = message
+                @ [ {| Message = copy
                        Folder = folder
                        Flags = flags
                        Keywords = keywords
@@ -126,6 +132,20 @@ let mockImapWithoutAuth () =
           HttpUrls = None
           Templates = Map.empty
           Inbox = Imap(Set.empty, mock) }
+
+    config, mock
+
+let mockImapWithHunter2Auth (user: string) (hasInsert: bool) =
+    let mock = MockImapInbox()
+
+    let authSet yay =
+        if yay then Set(Seq.singleton user) else Set.empty
+
+    let config =
+        { Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
+          HttpUrls = None
+          Templates = Map.empty
+          Inbox = Imap(authSet hasInsert, mock) }
 
     config, mock
 
