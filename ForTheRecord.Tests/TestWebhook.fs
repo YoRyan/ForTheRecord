@@ -380,7 +380,7 @@ let ``Webhook import sets Gmail label`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equivalent(seq { "Label_SomeID" } |> Set.ofSeq, called.LabelIds.Value)
+    Assert.Equivalent([ "Label_SomeID" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Webhook import sets Gmail starred label`` () =
@@ -400,14 +400,7 @@ let ``Webhook import sets Gmail starred label`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "INBOX"
-            "STARRED"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "INBOX"; "STARRED" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Webhook import sets Gmail important label and custom label`` () =
@@ -428,14 +421,7 @@ let ``Webhook import sets Gmail important label and custom label`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "Label_SomeID"
-            "IMPORTANT"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "Label_SomeID"; "IMPORTANT" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Webhook import sets IMAP flags`` () =

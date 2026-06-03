@@ -191,7 +191,7 @@ This is a test using custom templates.
 
     let called = mock.CalledImport.Value
     Assert.Equal("My Awesome Subject: Hello, World!", called.Message.Subject)
-    Assert.Equivalent(seq { "MyLabel" } |> Set.ofSeq, called.LabelIds.Value)
+    Assert.Equivalent([ "MyLabel" ] |> Set, called.LabelIds.Value)
 
     let body =
         called.Message.BodyParts
@@ -250,7 +250,7 @@ let ``Apprise import sets Gmail label`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equivalent(seq { "Label_SomeID" } |> Set.ofSeq, called.LabelIds.Value)
+    Assert.Equivalent([ "Label_SomeID" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Apprise import sets Gmail starred label`` () =
@@ -271,14 +271,7 @@ let ``Apprise import sets Gmail starred label`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "INBOX"
-            "STARRED"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "INBOX"; "STARRED" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Apprise import sets Gmail important label and custom label`` () =
@@ -300,14 +293,7 @@ let ``Apprise import sets Gmail important label and custom label`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "Label_SomeID"
-            "IMPORTANT"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "Label_SomeID"; "IMPORTANT" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Apprise import sets IMAP flags`` () =

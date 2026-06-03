@@ -222,14 +222,7 @@ let ``Curl import with application/x-www-form-urlencoded works`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "INBOX"
-            "STARRED"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "INBOX"; "STARRED" ] |> Set, called.LabelIds.Value)
 
     Assert.Equivalent(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
     Assert.Equivalent(Some true, called.NeverMarkSpam)
@@ -290,14 +283,7 @@ let ``Curl import with multipart/form-data works`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "INBOX"
-            "STARRED"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "INBOX"; "STARRED" ] |> Set, called.LabelIds.Value)
 
     Assert.Equivalent(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
     Assert.Equivalent(Some true, called.NeverMarkSpam)
@@ -444,15 +430,7 @@ This is the label test message.
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "INBOX"
-            "MyAwesomeLabel"
-            "MyAwesomeLabel2"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "INBOX"; "MyAwesomeLabel"; "MyAwesomeLabel2" ] |> Set, called.LabelIds.Value)
 
     Assert.Equal(None, called.InternalDateSource)
     Assert.Equal(None, called.NeverMarkSpam)

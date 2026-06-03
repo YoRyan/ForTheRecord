@@ -188,7 +188,7 @@ let ``Shoutrrr JSON import sets Gmail label`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equivalent(seq { "Label_SomeID" } |> Set.ofSeq, called.LabelIds.Value)
+    Assert.Equivalent([ "Label_SomeID" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Shoutrrr JSON import sets Gmail starred label and custom label`` () =
@@ -210,14 +210,7 @@ let ``Shoutrrr JSON import sets Gmail starred label and custom label`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "Label_SomeID"
-            "STARRED"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "Label_SomeID"; "STARRED" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Shoutrrr JSON import sets Gmail important label`` () =
@@ -238,14 +231,7 @@ let ``Shoutrrr JSON import sets Gmail important label`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "INBOX"
-            "IMPORTANT"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "INBOX"; "IMPORTANT" ] |> Set, called.LabelIds.Value)
 
 [<Fact>]
 let ``Shoutrrr JSON import handles custom template`` () =

@@ -48,14 +48,7 @@ let ``Ntfy JSON import works`` () =
     Assert.Contains("💿️", called.Message.Subject)
 
     // Priority level 4 sets the important label.
-    Assert.Equivalent(
-        seq {
-            "IMPORTANT"
-            "INBOX"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "IMPORTANT"; "INBOX" ] |> Set, called.LabelIds.Value)
 
     // Body must contain the attachment.
     let attachment = called.Message.Attachments |> Seq.exactlyOne
@@ -113,15 +106,7 @@ let ``Ntfy JSON import sets Gmail starred and important labels for priority 5`` 
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "STARRED"
-            "IMPORTANT"
-            "INBOX"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "STARRED"; "IMPORTANT"; "INBOX" ] |> Set, called.LabelIds.Value)
 
     let body = called.Message.HtmlBody
     Assert.Contains("Whatever", body)
@@ -145,14 +130,7 @@ let ``Ntfy JSON import sets Gmail important labels for priority 4`` () =
 
     let called = mock.CalledImport.Value
 
-    Assert.Equivalent(
-        seq {
-            "IMPORTANT"
-            "INBOX"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "IMPORTANT"; "INBOX" ] |> Set, called.LabelIds.Value)
 
     let body = called.Message.HtmlBody
     Assert.Contains("Whatever", body)
@@ -175,7 +153,7 @@ let ``Ntfy JSON import sets no additional Gmail labels for priority 3`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equivalent(seq { "INBOX" } |> Set.ofSeq, called.LabelIds.Value)
+    Assert.Equivalent([ "INBOX" ] |> Set, called.LabelIds.Value)
 
     let body = called.Message.HtmlBody
     Assert.Contains("Whatever", body)
@@ -562,15 +540,7 @@ let ``Ntfy simple import example 2`` () =
     Assert.Contains("⚠️", called.Message.Subject)
     Assert.Contains("💀️", called.Message.Subject)
 
-    Assert.Equivalent(
-        seq {
-            "STARRED"
-            "IMPORTANT"
-            "INBOX"
-        }
-        |> Set.ofSeq,
-        called.LabelIds.Value
-    )
+    Assert.Equivalent([ "STARRED"; "IMPORTANT"; "INBOX" ] |> Set, called.LabelIds.Value)
 
     let body = called.Message.HtmlBody
     Assert.Contains("Remote access to phils-laptop detected. Act right away", body)
@@ -591,7 +561,7 @@ let ``Ntfy simple import example 3`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equivalent(seq { "INBOX" } |> Set.ofSeq, called.LabelIds.Value)
+    Assert.Equivalent([ "INBOX" ] |> Set, called.LabelIds.Value)
 
     let body = called.Message.HtmlBody
     Assert.Contains("There&#39;s someone at the door. &#128054;", body)
@@ -609,7 +579,7 @@ let ``Ntfy simple import works with markdown`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equivalent(seq { "INBOX" } |> Set.ofSeq, called.LabelIds.Value)
+    Assert.Equivalent([ "INBOX" ] |> Set, called.LabelIds.Value)
 
     let body = called.Message.HtmlBody
     Assert.Contains("Look ma, <strong>bold text</strong>, <em>italics</em>", body)
