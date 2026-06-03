@@ -179,7 +179,7 @@ let ``Shoutrrr JSON import sets Gmail label`` () =
     use content =
         {| title = "Test Title"
            message = "Test Message"
-           gmail_label_id = "Label_SomeID" |}
+           gmail_label_ids = [ "Label_SomeID" ] |}
         |> makeJsonContent
 
     request.Content <- content
@@ -199,7 +199,7 @@ let ``Shoutrrr JSON import sets Gmail starred label and custom label`` () =
         {| title = "Test Title"
            message = "Test Message"
            ``type`` = "info"
-           gmail_label_id = "Label_SomeID"
+           gmail_label_ids = [ "Label_SomeID" ]
            gmail_starred = "true" |}
         |> makeJsonContent
 

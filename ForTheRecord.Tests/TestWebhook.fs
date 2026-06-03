@@ -371,7 +371,7 @@ let ``Webhook import sets Gmail label`` () =
     use content =
         {| title = "Test Title"
            message = "Test Message"
-           gmail_label_id = "Label_SomeID" |}
+           gmail_label_ids = [ "Label_SomeID" ] |}
         |> makeJsonContent
 
     request.Content <- content
@@ -417,7 +417,7 @@ let ``Webhook import sets Gmail important label and custom label`` () =
     use content =
         {| title = "Test Title"
            message = "Test Message"
-           gmail_label_id = "Label_SomeID"
+           gmail_label_ids = [ "Label_SomeID" ]
            gmail_important = "true" |}
         |> makeJsonContent
 

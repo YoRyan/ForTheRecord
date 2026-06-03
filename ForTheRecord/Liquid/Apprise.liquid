@@ -1,6 +1,13 @@
 To: {{ to | default: "me" }}
 From: {{ from | default: "Apprise via ForTheRecord <me>" }}
-X-FTR-Gmail-LabelID: {{ gmail_label_id | default: "INBOX" }}
+{% if gmail_label_ids -%}
+  {% for label in gmail_label_ids -%}
+X-FTR-Gmail-LabelID: {{ label }}
+{% endfor -%}
+  {% else -%}
+X-FTR-Gmail-LabelID: INBOX
+{% endif -%}
+if {{ gmail_label_ids }}
 {% if type == "failure" or gmail_starred -%}
 X-FTR-Gmail-LabelID: STARRED
 {% endif -%}

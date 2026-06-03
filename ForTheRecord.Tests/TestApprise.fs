@@ -241,7 +241,7 @@ let ``Apprise import sets Gmail label`` () =
         {| title = "Test Title"
            message = "Test Message"
            ``type`` = "info"
-           gmail_label_id = "Label_SomeID" |}
+           gmail_label_ids = [ "Label_SomeID" ] |}
         |> makeJsonContent
 
     request.Content <- content
@@ -289,7 +289,7 @@ let ``Apprise import sets Gmail important label and custom label`` () =
         {| title = "Test Title"
            message = "Test Message"
            ``type`` = "info"
-           gmail_label_id = "Label_SomeID"
+           gmail_label_ids = [ "Label_SomeID" ]
            gmail_important = "true" |}
         |> makeJsonContent
 
