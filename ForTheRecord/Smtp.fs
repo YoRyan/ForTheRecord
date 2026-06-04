@@ -56,7 +56,7 @@ type private UserAuthenticator(config: ServeConfig) =
 
 let serveSmtpAsync (config: ServeConfig) =
     task {
-        let builder = SmtpServerOptionsBuilder() |> _.ServerName("ForTheRecord")
+        let builder = SmtpServerOptionsBuilder().ServerName "ForTheRecord"
 
         for url in config.SmtpUrls.Value do
             let uri = Uri url
@@ -66,9 +66,9 @@ let serveSmtpAsync (config: ServeConfig) =
                 | UriHostNameType.IPv4
                 | UriHostNameType.IPv6 ->
                     EndpointDefinitionBuilder()
-                    |> _.Endpoint(IPEndPoint(IPAddress.Parse uri.Host, if uri.IsDefaultPort then 2525 else uri.Port))
-                    |> _.AllowUnsecureAuthentication(true)
-                    |> _.Build()
+                        .Endpoint(IPEndPoint(IPAddress.Parse uri.Host, if uri.IsDefaultPort then 2525 else uri.Port))
+                        .AllowUnsecureAuthentication(true)
+                        .Build()
                 | _ -> failwithf "Invalid SMTP listening address (must use an IP address for the host): %s" url
 
             builder.Endpoint endpoint |> ignore
@@ -85,13 +85,13 @@ let serveTestSmtpAsync (config: ServeConfig) (cancel: CancellationToken) =
     task {
         let options =
             SmtpServerOptionsBuilder()
-            |> _.ServerName("ForTheRecord")
-            |> _.Endpoint(fun builder ->
-                builder
-                |> _.Port(testSmtpPort, false)
-                |> _.AllowUnsecureAuthentication(true)
-                |> ignore)
-            |> _.Build()
+                .ServerName("ForTheRecord")
+                .Endpoint(fun builder ->
+                    builder
+                    |> _.Port(testSmtpPort, false)
+                    |> _.AllowUnsecureAuthentication(true)
+                    |> ignore)
+                .Build()
 
         let provider = ComponentModel.ServiceProvider()
         provider.Add(MessageStore config)
