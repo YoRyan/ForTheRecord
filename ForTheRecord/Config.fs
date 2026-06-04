@@ -34,16 +34,28 @@ type ServeConfig =
 // lot of ceremony.
 
 let private inTable<'T> k (t: TomlTable) =
-    t.TryGetValue k |> tryGetByref |> Option.bind tryDowncast<'T>
+    t.TryGetValue k
+    |> tryGetByref
+    |> Option.map (function
+        | :? 'T as v -> v
+        | v -> failwithf "Expected a %s: %s" (typeof<'T>.ToString()) (v.ToString()))
 
-let private asList<'T> (a: TomlArray) : 'T list = Seq.cast<'T> a |> Seq.toList
+let private asList<'T> (a: TomlArray) : 'T list =
+    a
+    |> Seq.map (function
+        | :? 'T as v -> v
+        | v -> failwithf "Expected a %s: %s" (typeof<'T>.ToString()) (v.ToString()))
+    |> Seq.toList
 
 let private asTableList (ta: TomlTableArray) : TomlTable list = ta |> Seq.toList
 
 let private asMap<'V> (t: TomlTable) : Map<string, 'V> =
     t
     |> Seq.map (|KeyValue|)
-    |> Seq.choose (fun (k, v) -> v |> tryDowncast<'V> |> Option.map (fun cast -> k, cast))
+    |> Seq.map (fun (k, v) ->
+        match v with
+        | :? 'V as v -> k, v
+        | v -> failwithf "Expected a %s: %s" (typeof<'V>.ToString()) (v.ToString()))
     |> Map.ofSeq
 
 let getGmailInbox (config: ServeConfig) =
