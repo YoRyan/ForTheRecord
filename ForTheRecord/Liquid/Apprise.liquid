@@ -7,7 +7,6 @@ X-FTR-Gmail-LabelID: {{ label }}
   {% else -%}
 X-FTR-Gmail-LabelID: INBOX
 {% endif -%}
-if {{ gmail_label_ids }}
 {% if type == "failure" or gmail_starred -%}
 X-FTR-Gmail-LabelID: STARRED
 {% endif -%}
