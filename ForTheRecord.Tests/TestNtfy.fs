@@ -5,6 +5,7 @@ open System.Net.Http
 open System.Text
 
 open MailKit
+open Microsoft.Extensions.Logging
 open Xunit
 
 open ForTheRecord.Config
@@ -456,7 +457,8 @@ let ``Ntfy JSON import handles custom template`` () =
     let mock = MockGmailInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates =
@@ -726,7 +728,8 @@ let ``Ntfy simple import handles custom template`` () =
     let mock = MockGmailInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates =

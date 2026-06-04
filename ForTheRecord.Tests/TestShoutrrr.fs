@@ -4,6 +4,7 @@ open System.Net
 open System.Net.Http
 open System.Text
 
+open Microsoft.Extensions.Logging
 open Xunit
 
 open ForTheRecord.Config
@@ -41,7 +42,8 @@ let ``Shoutrrr import handles custom template`` () =
     let mock = MockGmailInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates =
@@ -82,7 +84,8 @@ let ``Shoutrrr import handles custom template with reference to user`` () =
     let config, mock = mockGmailWithHunter2Auth "AzureDiamond" true
 
     let config =
-        { Htpasswd = config.Htpasswd
+        { LogLevel = LogLevel.None
+          Htpasswd = config.Htpasswd
           HttpUrls = None
           SmtpUrls = None
           Templates =
@@ -239,7 +242,8 @@ let ``Shoutrrr JSON import handles custom template`` () =
     let mock = MockGmailInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates =

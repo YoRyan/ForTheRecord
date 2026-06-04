@@ -1,6 +1,7 @@
 ﻿open System.IO
 open System.Threading.Tasks
 
+open Microsoft.Extensions.Logging
 open Tomlyn.Model
 
 open ForTheRecord.Config
@@ -9,6 +10,10 @@ open ForTheRecord.Smtp
 
 let runServers (config: ServeConfig) =
     task {
+        use loggerFactory = LoggerFactory.Create(configureLogging config)
+        let logger = loggerFactory.CreateLogger "ForTheRecord.Program"
+        logger.LogInformation("Loaded app configuration:\n{}", config)
+
         match config.HttpUrls, config.SmtpUrls with
         | Some _, Some _ ->
             return!

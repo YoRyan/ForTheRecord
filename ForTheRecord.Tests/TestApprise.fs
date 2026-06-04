@@ -153,7 +153,8 @@ let ``Apprise import handles custom template`` () =
     let mock = MockGmailInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = Microsoft.Extensions.Logging.LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates =

@@ -4,6 +4,7 @@ open System
 open System.Net
 open System.Threading
 
+open Microsoft.Extensions.Logging
 open SmtpServer
 
 open ForTheRecord.Config
@@ -11,7 +12,7 @@ open ForTheRecord.Config
 [<Literal>]
 let testSmtpPort = 12525
 
-type private MessageStore(config: ServeConfig) =
+type private MessageStore(config: ServeConfig, logger: ILogger) =
     inherit Storage.MessageStore()
 
     override _.SaveAsync
@@ -24,14 +25,18 @@ type private MessageStore(config: ServeConfig) =
         task {
             use stream = System.IO.Pipelines.PipeReader.Create(buffer).AsStream false
 
-            match config.Inbox with
-            | Gmail(_, inbox) -> do! Gmail.importWholeMessageToGmail inbox stream
-            | Imap(_, inbox) -> do! Imap.importWholeMessageToImap inbox stream
+            try
+                match config.Inbox with
+                | Gmail(_, inbox) -> do! Gmail.importWholeMessageToGmail inbox stream
+                | Imap(_, inbox) -> do! Imap.importWholeMessageToImap inbox stream
 
-            return Protocol.SmtpResponse.Ok
+                return Protocol.SmtpResponse.Ok
+            with ex ->
+                logger.LogError(ex, "Exception when processing mail")
+                return Protocol.SmtpResponse.TransactionFailed
         }
 
-type private UserAuthenticator(config: ServeConfig) =
+type private UserAuthenticator(config: ServeConfig, logger: ILogger) =
     inherit Authentication.UserAuthenticator()
 
     override _.AuthenticateAsync
@@ -48,7 +53,19 @@ type private UserAuthenticator(config: ServeConfig) =
                        | Gmail(authInsert, _) -> authInsert.Contains
                        | Imap(authAppend, _) -> authAppend.Contains
 
-                return credentialsOk && hasScope
+                match credentialsOk, hasScope with
+                | true, true -> return true
+                | true, false ->
+                    logger.LogInformation(
+                        "User {} does not have the appropriate permission granted to upload mail",
+                        user,
+                        password
+                    )
+
+                    return false
+                | false, _ ->
+                    logger.LogInformation("Rejecting unknown user {}, password {}", user, password)
+                    return false
             | None -> return true
         }
 
@@ -56,6 +73,9 @@ type private UserAuthenticator(config: ServeConfig) =
 
 let serveSmtpAsync (config: ServeConfig) =
     task {
+        use loggerFactory = LoggerFactory.Create(configureLogging config)
+        let logger = loggerFactory.CreateLogger "ForTheRecord.Smtp"
+
         let builder = SmtpServerOptionsBuilder().ServerName "ForTheRecord"
 
         for url in config.SmtpUrls.Value do
@@ -74,8 +94,8 @@ let serveSmtpAsync (config: ServeConfig) =
             builder.Endpoint endpoint |> ignore
 
         let provider = ComponentModel.ServiceProvider()
-        provider.Add(MessageStore config)
-        provider.Add(UserAuthenticator config)
+        provider.Add(MessageStore(config, logger))
+        provider.Add(UserAuthenticator(config, logger))
 
         let server = SmtpServer.SmtpServer(builder.Build(), provider)
         return! server.StartAsync CancellationToken.None
@@ -83,6 +103,8 @@ let serveSmtpAsync (config: ServeConfig) =
 
 let serveTestSmtpAsync (config: ServeConfig) (cancel: CancellationToken) =
     task {
+        let logger = Abstractions.NullLogger.Instance
+
         let options =
             SmtpServerOptionsBuilder()
                 .ServerName("ForTheRecord")
@@ -94,8 +116,8 @@ let serveTestSmtpAsync (config: ServeConfig) (cancel: CancellationToken) =
                 .Build()
 
         let provider = ComponentModel.ServiceProvider()
-        provider.Add(MessageStore config)
-        provider.Add(UserAuthenticator config)
+        provider.Add(MessageStore(config, logger))
+        provider.Add(UserAuthenticator(config, logger))
 
         let server = SmtpServer.SmtpServer(options, provider)
         return! server.StartAsync cancel

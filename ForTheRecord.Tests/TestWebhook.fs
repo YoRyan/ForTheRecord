@@ -5,6 +5,7 @@ open System.Net.Http
 open System.Text
 
 open MailKit
+open Microsoft.Extensions.Logging
 open Xunit
 
 open ForTheRecord.Config
@@ -83,7 +84,8 @@ let ``JSON import handles custom template with json key`` () =
     let mock = MockGmailInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates =
@@ -131,7 +133,8 @@ let ``JSON import handles custom template with reference to user`` () =
     let config, mock = mockGmailWithHunter2Auth "AzureDiamond" true
 
     let config =
-        { Htpasswd = config.Htpasswd
+        { LogLevel = LogLevel.None
+          Htpasswd = config.Htpasswd
           HttpUrls = None
           SmtpUrls = None
           Templates =
@@ -177,7 +180,8 @@ let ``JSON import handles reference to gmail`` () =
     let mock = MockGmailInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates =
@@ -224,7 +228,8 @@ let ``JSON import handles reference to imap`` () =
     let mock = MockImapInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates =

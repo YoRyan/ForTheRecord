@@ -16,6 +16,7 @@ open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 open MimeKit
 
 open ForTheRecord.Config
@@ -34,6 +35,8 @@ module private Roles =
 
     [<Literal>]
     let imapAppend = "ImapAppend"
+
+let private getLogger (ctx: HttpContext) = ctx.GetLogger "ForTheRecord.Http"
 
 let private parseContentType (s: string) =
     s
@@ -278,6 +281,7 @@ let private requiresJson =
 let private importWholeMessage (template: string) (model: obj, modelKey: string option) =
     handleContext (fun ctx ->
         task {
+            let logger = getLogger ctx
             let config = ctx.GetService<ServeConfig>()
             let parser = ctx.GetService<FluidParser>()
 
@@ -286,35 +290,37 @@ let private importWholeMessage (template: string) (model: obj, modelKey: string 
             if not ok then
                 failwithf "Failed to parse template: %s" error
 
-            let ftr =
+            let context =
                 seq {
-                    "user", authenticatedUser ctx |> Option.defaultValue null :> obj
-                    "is_gmail", config.Inbox.IsGmail
-                    "is_imap", config.Inbox.IsImap
-                    "guid", string (Guid.NewGuid())
+                    match tryDowncast<IDictionary<string, obj>> model with
+                    | Some d -> yield! d |> Seq.map (|KeyValue|)
+                    | None -> ()
+
+                    match modelKey with
+                    | Some key -> key, model
+                    | None -> ()
+
+                    "ftr",
+                    seq {
+                        "user", authenticatedUser ctx |> Option.defaultValue null :> obj
+                        "is_gmail", config.Inbox.IsGmail
+                        "is_imap", config.Inbox.IsImap
+                        "guid", string (Guid.NewGuid())
+                    }
+                    |> dict
+                    :> obj
                 }
                 |> dict
 
-            let options = ctx.GetService<TemplateOptions>()
+            let! render =
+                (context, ctx.GetService<TemplateOptions>())
+                |> TemplateContext
+                |> template.RenderAsync
 
-            let context =
-                TemplateContext(
-                    seq {
-                        match tryDowncast<IDictionary<string, obj>> model with
-                        | Some d -> yield! d |> Seq.map (|KeyValue|)
-                        | None -> ()
+            if logger.IsEnabled LogLevel.Debug then
+                logger.LogDebug("Template context:\n{}", JsonSerializer.Serialize context)
+                logger.LogDebug("Template output:\n\n{}", render)
 
-                        match modelKey with
-                        | Some key -> key, model
-                        | None -> ()
-
-                        "ftr", ftr
-                    }
-                    |> dict,
-                    options
-                )
-
-            let! render = template.RenderAsync context
             use stream = new MemoryStream(Encoding.UTF8.GetBytes render)
 
             do!
@@ -556,6 +562,7 @@ let serveHttpAsync (config: ServeConfig) =
         let builder = WebApplication.CreateBuilder()
         configureServices config builder.Services
         configureWebHost config builder.WebHost
+        configureLogging config builder.Logging
 
         let app = builder.Build()
         app.UseAuthentication() |> ignore

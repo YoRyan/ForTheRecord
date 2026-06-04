@@ -22,7 +22,8 @@ let ``Endpoints not available when Gmail is not configured`` (uri: string) =
     let mock = MockImapInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = Microsoft.Extensions.Logging.LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates = Map.empty

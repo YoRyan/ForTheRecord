@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open Google.Apis.Gmail.v1
 open Google.Apis.Services
 open Meziantou.Framework.Http
+open Microsoft.Extensions.Logging
 open Tomlyn.Model
 
 open ForTheRecord.Gmail
@@ -21,7 +22,8 @@ type ConfiguredInbox =
     | Imap of authAppend: Set<string> * inbox: IImapInbox
 
 type ServeConfig =
-    { Htpasswd: HtpasswdFile option
+    { LogLevel: LogLevel
+      Htpasswd: HtpasswdFile option
       HttpUrls: string list option
       SmtpUrls: string list option
       Templates: Map<string, string>
@@ -59,7 +61,21 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
         let! inbox = loadInboxConfig t
 
         return
-            { Htpasswd =
+            { LogLevel =
+                t
+                |> inTable<string> "loglevel"
+                |> Option.map _.ToLowerInvariant()
+                |> Option.map (fun s ->
+                    match s with
+                    | "trace" -> LogLevel.Trace
+                    | "debug" -> LogLevel.Debug
+                    | "information" -> LogLevel.Information
+                    | "warning" -> LogLevel.Warning
+                    | "error" -> LogLevel.Error
+                    | "critical" -> LogLevel.Critical
+                    | _ -> failwithf "Invalid log level: %s" s)
+                |> Option.defaultValue LogLevel.Information
+              Htpasswd =
                 t
                 |> inTable "auth"
                 |> Option.bind (inTable<string> "htpasswd")
@@ -69,6 +85,13 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
               Templates = t |> inTable "templates" |> Option.map asMap |> Option.defaultValue Map.empty
               Inbox = inbox }
     }
+
+let configureLogging (config: ServeConfig) (builder: ILoggingBuilder) =
+    builder
+    |> _.AddConsole()
+    |> _.AddDebug()
+    |> _.SetMinimumLevel(config.LogLevel)
+    |> ignore
 
 let loadGmailConfig (t: TomlTable) =
     task {

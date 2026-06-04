@@ -11,6 +11,7 @@ open Meziantou.Framework.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Logging
 open MailKit
 open MimeKit
 
@@ -100,7 +101,8 @@ let mockGmailWithoutAuth () =
     let mock = MockGmailInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates = Map.empty
@@ -115,7 +117,8 @@ let mockGmailWithHunter2Auth (user: string) (hasInsert: bool) =
         if yay then Set(Seq.singleton user) else Set.empty
 
     let config =
-        { Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
+        { LogLevel = LogLevel.None
+          Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
           HttpUrls = None
           SmtpUrls = None
           Templates = Map.empty
@@ -127,7 +130,8 @@ let mockImapWithoutAuth () =
     let mock = MockImapInbox()
 
     let config =
-        { Htpasswd = None
+        { LogLevel = LogLevel.None
+          Htpasswd = None
           HttpUrls = None
           SmtpUrls = None
           Templates = Map.empty
@@ -142,7 +146,8 @@ let mockImapWithHunter2Auth (user: string) (hasInsert: bool) =
         if yay then Set(Seq.singleton user) else Set.empty
 
     let config =
-        { Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
+        { LogLevel = LogLevel.None
+          Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
           HttpUrls = None
           SmtpUrls = None
           Templates = Map.empty
