@@ -92,8 +92,8 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
                 |> inTable "auth"
                 |> Option.bind (inTable<string> "htpasswd")
                 |> Option.map HtpasswdFile.Parse
-              HttpUrls = t |> inTable "http" |> Option.bind (inTable "urls") |> Option.map asList
-              SmtpUrls = t |> inTable "smtp" |> Option.bind (inTable "urls") |> Option.map asList
+              HttpUrls = t |> inTable "http" |> Option.bind (inTable "listenurls") |> Option.map asList
+              SmtpUrls = t |> inTable "smtp" |> Option.bind (inTable "listenurls") |> Option.map asList
               Templates = t |> inTable "templates" |> Option.map asMap |> Option.defaultValue Map.empty
               Inbox = inbox }
     }
@@ -166,8 +166,8 @@ let loadImapConfig (t: TomlTable) =
     let perms = imap |> Option.bind (inTable "permissions")
 
     let uri =
-        match imap |> Option.bind (inTable "uri") with
-        | Some uri -> Uri uri
+        match imap |> Option.bind (inTable "connecturl") with
+        | Some url -> Uri url
         | None -> failwith "Missing imap:// or imaps:// connection URL."
 
     let username, password =
@@ -189,8 +189,8 @@ let testImap (t: TomlTable) =
         let imap = t |> inTable "imap"
 
         let uri =
-            match imap |> Option.bind (inTable "uri") with
-            | Some uri -> Uri uri
+            match imap |> Option.bind (inTable "connecturl") with
+            | Some url -> Uri url
             | None -> failwith "Missing imap:// or imaps:// connection URL."
 
         let username, (password: string) =
