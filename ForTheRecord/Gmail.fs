@@ -1,20 +1,13 @@
 module ForTheRecord.Gmail
 
 open System
-open System.Buffers.Text
-open System.Collections.Generic
 open System.IO
 open System.Threading
 open System.Threading.Tasks
 
 open Google.Apis.Auth.OAuth2
 open Google.Apis.Auth.OAuth2.Flows
-open Google.Apis.Auth.OAuth2.Responses
 open Google.Apis.Gmail.v1
-open Google.Apis.Util.Store
-open MimeKit
-
-open ForTheRecord.Helpers
 
 [<Literal>]
 let private userId = "user"
@@ -49,7 +42,7 @@ type TerminalCodeReceiver() =
                     "\nOnce you've authorized the request, your browser will redirect to an http://localhost URL that will fail to load. Paste the entire URL here:"
 
                 let redirect = Uri(Console.ReadLine())
-                let response = AuthorizationCodeResponseUrl redirect.Query
+                let response = Responses.AuthorizationCodeResponseUrl redirect.Query
                 printfn "\nOAuth flow completed."
                 return response
             }
@@ -64,7 +57,7 @@ let loadCredentials (codeReceiver: ICodeReceiver) (file: FileInfo) (store: Direc
 
         let initializer = GoogleAuthorizationCodeFlow.Initializer()
         initializer.ClientSecrets <- secrets.Secrets
-        initializer.DataStore <- new FileDataStore(store.FullName, true)
+        initializer.DataStore <- new Google.Apis.Util.Store.FileDataStore(store.FullName, true)
         initializer.Scopes <- seq { GmailService.Scope.GmailInsert }
 
         return!
@@ -100,8 +93,13 @@ type GmailInbox(service: GmailService) =
                 do! message.CopyToAsync stream
 
                 let data = Data.Message()
-                data.Raw <- Base64Url.EncodeToString(stream.ToArray())
-                data.LabelIds <- labelIds |> Option.defaultValue [ "INBOX" ] |> List.insertAt 0 "UNREAD" |> List
+                data.Raw <- Buffers.Text.Base64Url.EncodeToString(stream.ToArray())
+
+                data.LabelIds <-
+                    labelIds
+                    |> Option.defaultValue [ "INBOX" ]
+                    |> List.insertAt 0 "UNREAD"
+                    |> Collections.Generic.List
 
                 let request = service.Users.Messages.Import(data, "me")
                 request.NeverMarkSpam <- neverMarkSpam |> Option.defaultValue true
@@ -125,7 +123,7 @@ let importWholeMessageToGmail (inbox: IGmailInbox) (message: Stream) =
         do! message.CopyToAsync stream
         stream.Seek(0, SeekOrigin.Begin) |> ignore
 
-        let! parsed = MimeMessage.LoadAsync stream
+        let! parsed = MimeKit.MimeMessage.LoadAsync stream
         let headers = parsed.Headers
 
         let labelIds =
@@ -145,7 +143,7 @@ let importWholeMessageToGmail (inbox: IGmailInbox) (message: Stream) =
         let readBool (field: string) =
             match headers[field] with
             | null -> None
-            | s -> s |> Boolean.TryParse |> tryGetByref
+            | s -> s |> Boolean.TryParse |> Helpers.tryGetByref
 
         stream.Seek(0, SeekOrigin.Begin) |> ignore
 

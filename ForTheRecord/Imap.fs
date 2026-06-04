@@ -1,12 +1,9 @@
 module ForTheRecord.Imap
 
 open System
-open System.IO
-open System.Threading
 open System.Threading.Tasks
 
 open MailKit
-open MailKit.Net.Imap
 open MimeKit
 
 type IImapInbox =
@@ -15,8 +12,8 @@ type IImapInbox =
             Task<unit>
 
 type ImapInbox(uri: Uri, username: string, password: string) =
-    let client = new ImapClient()
-    let clientSem = new SemaphoreSlim 1
+    let client = new Net.Imap.ImapClient()
+    let clientSem = new Threading.SemaphoreSlim 1
 
     let ensureConnected () =
         task {
@@ -75,7 +72,7 @@ let parseImapFlags (flags: string list) =
 
 /// Import a finalized message to Imap, using special headers to determine
 /// which flags and metadata to apply.
-let importWholeMessageToImap (inbox: IImapInbox) (message: Stream) =
+let importWholeMessageToImap (inbox: IImapInbox) (message: IO.Stream) =
     task {
         let! message = MimeMessage.LoadAsync message
         let headers = message.Headers

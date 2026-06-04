@@ -3,10 +3,7 @@ module Tests.Fixtures
 open System
 open System.IO
 open System.Net.Http
-open System.Net.Http.Headers
 open System.Text
-open System.Text.Json
-open System.Threading
 open System.Threading.Tasks
 
 open Giraffe
@@ -16,11 +13,9 @@ open Microsoft.AspNetCore.TestHost
 open Microsoft.Extensions.Hosting
 open MailKit
 open MimeKit
-open Xunit
 
 open ForTheRecord.Config
 open ForTheRecord.Gmail
-open ForTheRecord.Helpers
 open ForTheRecord.Http
 open ForTheRecord.Imap
 open ForTheRecord.Smtp
@@ -155,7 +150,7 @@ let mockImapWithHunter2Auth (user: string) (hasInsert: bool) =
 
     config, mock
 
-let testSmtpServer (config: ServeConfig) (cancel: CancellationToken) =
+let testSmtpServer (config: ServeConfig) (cancel: Threading.CancellationToken) =
     task {
         let runServer = serveTestSmtpAsync config cancel
         let mutable success = false
@@ -173,7 +168,7 @@ let testSmtpServer (config: ServeConfig) (cancel: CancellationToken) =
     }
 
 let makeBasicAuth (user: string) (pass: string) =
-    AuthenticationHeaderValue("Basic", $"{user}:{pass}" |> Encoding.UTF8.GetBytes |> Convert.ToBase64String)
+    Headers.AuthenticationHeaderValue("Basic", $"{user}:{pass}" |> Encoding.UTF8.GetBytes |> Convert.ToBase64String)
 
 let makeContent (mime: string) (s: string) =
     let content = new ByteArrayContent(Encoding.UTF8.GetBytes s)
@@ -183,7 +178,7 @@ let makeContent (mime: string) (s: string) =
 let makeTextContent = makeContent "text/plain"
 
 let makeJsonContent (o: obj) =
-    makeContent "application/json" (JsonSerializer.Serialize o)
+    makeContent "application/json" (System.Text.Json.JsonSerializer.Serialize o)
 
 let readEntity (e: MimeEntity) =
     use stream = new MemoryStream()
@@ -193,11 +188,11 @@ let readEntity (e: MimeEntity) =
 let entityContainsBase64Of (e: MimeEntity) (data: byte array) =
     let s = e |> readEntity |> Encoding.UTF8.GetString |> _.Replace("\n", "")
     let b64 = Convert.ToBase64String data
-    Assert.Contains(b64, s)
+    Xunit.Assert.Contains(b64, s)
 
 let downloadBytes (url: string) =
     task {
-        let! response = httpClient.GetAsync url
+        let! response = ForTheRecord.Helpers.httpClient.GetAsync url
         return! response.Content.ReadAsByteArrayAsync()
     }
     |> Async.AwaitTask

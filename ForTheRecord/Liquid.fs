@@ -2,16 +2,11 @@ module ForTheRecord.Liquid
 
 open System
 open System.Collections.Generic
-open System.Reflection
-open System.Text
 open System.Text.Json
-open System.Text.RegularExpressions
 open System.Threading.Tasks
 
 open Fluid
 open Fluid.Values
-open Markdig
-open Microsoft.AspNetCore.Http
 
 open ForTheRecord.Helpers
 
@@ -37,7 +32,7 @@ let readAssemblyTemplate (template: AssemblyTemplate) =
 
 /// Map of GitHub emoji codes to emojis.
 let private gemojiMap =
-    let assembly = Assembly.GetExecutingAssembly()
+    let assembly = Reflection.Assembly.GetExecutingAssembly()
 
     use stream =
         assembly.GetManifestResourceStream $"{assembly.GetName().Name}.emoji.json"
@@ -58,7 +53,7 @@ type Filters() =
     static member encodeUtf8 (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
         input
         |> _.ToStringValue()
-        |> Encoding.UTF8.GetBytes
+        |> System.Text.Encoding.UTF8.GetBytes
         |> Convert.ToBase64String
         |> fun b64 -> $"=?UTF-8?B?{b64}?="
         |> StringValue
@@ -68,7 +63,7 @@ type Filters() =
     static member markdown (input: FluidValue) (_arguments: FilterArguments) (_context: TemplateContext) =
         input
         |> _.ToStringValue()
-        |> Markdown.ToHtml
+        |> Markdig.Markdown.ToHtml
         |> StringValue
         |> ValueTask.FromResult<FluidValue>
 
@@ -285,7 +280,7 @@ let private parseNtfyActions (v: string) =
         | "" -> []
         | _ ->
             let groups =
-                Regex.Match(
+                System.Text.RegularExpressions.Regex.Match(
                     v,
                     @"^\s*(?:(?<name>[\w.]+)=)?(?:'(?<value>[^']*)'|""(?<value>[^""]*)""|(?<value>[^,;]*))\s*(?<term>,|;|$)(?<rest>.*)"
                 )
@@ -337,7 +332,7 @@ let private parseNtfyActions (v: string) =
 /// model for rendering by a template. See
 /// https://docs.ntfy.sh/publish/#list-of-all-parameters and
 /// https://docs.ntfy.sh/publish/#publish-as-json.
-let ntfyModelFromRequest (request: HttpRequest) : IDictionary<string, obj> =
+let ntfyModelFromRequest (request: Microsoft.AspNetCore.Http.HttpRequest) : IDictionary<string, obj> =
     seq {
         yield! request.Headers
         yield! request.Query

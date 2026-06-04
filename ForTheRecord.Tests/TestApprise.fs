@@ -1,16 +1,13 @@
 module Tests.Apprise
 
-open System
 open System.Net
 open System.Net.Http
 open System.Text
 
 open MailKit
-open MimeKit
 open Xunit
 
 open ForTheRecord.Config
-open ForTheRecord.Gmail
 
 open Fixtures
 
@@ -60,7 +57,7 @@ let ``Apprise import handles 'text' input format`` () =
     let called = mock.CalledImport.Value
     let body = Seq.exactlyOne called.Message.BodyParts
     Assert.Contains("This is a plain text message.", body |> readEntity |> Encoding.UTF8.GetString)
-    Assert.Equivalent(body.ContentType, ContentType("text", "plain"))
+    Assert.Equivalent(body.ContentType, MimeKit.ContentType("text", "plain"))
 
 [<Fact>]
 let ``Apprise import handles 'html' input format`` () =
@@ -110,7 +107,7 @@ let ``Apprise import handles attachments`` () =
             "test.html", "text/html", "<p>hello <strong>world</strong></p>"
         }
         |> Seq.map (fun (filename, mimetype, base64) ->
-            filename, mimetype, base64 |> Encoding.UTF8.GetBytes |> Convert.ToBase64String)
+            filename, mimetype, base64 |> Encoding.UTF8.GetBytes |> System.Convert.ToBase64String)
         |> List.ofSeq
 
     use content =
@@ -228,7 +225,7 @@ let ``Apprise import sets Gmail flags`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equal(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
+    Assert.Equal(Some ForTheRecord.Gmail.InternalDateSourceEnum.DateHeader, called.InternalDateSource)
     Assert.Equal(Some true, called.NeverMarkSpam)
     Assert.Equal(Some false, called.ProcessForCalendar)
     Assert.Equal(Some false, called.Deleted)

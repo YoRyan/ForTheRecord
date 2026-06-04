@@ -8,7 +8,6 @@ open MailKit
 open Xunit
 
 open ForTheRecord.Config
-open ForTheRecord.Gmail
 
 open Fixtures
 
@@ -362,7 +361,7 @@ let ``Webhook import sets Gmail flags`` () =
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
 
     let called = mock.CalledImport.Value
-    Assert.Equal(Some InternalDateSourceEnum.DateHeader, called.InternalDateSource)
+    Assert.Equal(Some ForTheRecord.Gmail.InternalDateSourceEnum.DateHeader, called.InternalDateSource)
     Assert.Equal(Some true, called.NeverMarkSpam)
     Assert.Equal(Some false, called.ProcessForCalendar)
     Assert.Equal(Some false, called.Deleted)

@@ -1,17 +1,12 @@
 module ForTheRecord.Smtp
 
 open System
-open System.Buffers
-open System.IO.Pipelines
-open System.Threading
 open System.Net
+open System.Threading
 
 open SmtpServer
-open SmtpServer.Protocol
 
 open ForTheRecord.Config
-open ForTheRecord.Gmail
-open ForTheRecord.Imap
 
 [<Literal>]
 let testSmtpPort = 12525
@@ -23,17 +18,17 @@ type private MessageStore(config: ServeConfig) =
         (
             context: ISessionContext,
             transaction: IMessageTransaction,
-            buffer: ReadOnlySequence<byte>,
+            buffer: Buffers.ReadOnlySequence<byte>,
             cancellationToken: CancellationToken
         ) =
         task {
-            use stream = PipeReader.Create(buffer).AsStream false
+            use stream = System.IO.Pipelines.PipeReader.Create(buffer).AsStream false
 
             match config.Inbox with
-            | Gmail(_, inbox) -> do! importWholeMessageToGmail inbox stream
-            | Imap(_, inbox) -> do! importWholeMessageToImap inbox stream
+            | Gmail(_, inbox) -> do! Gmail.importWholeMessageToGmail inbox stream
+            | Imap(_, inbox) -> do! Imap.importWholeMessageToImap inbox stream
 
-            return SmtpResponse.Ok
+            return Protocol.SmtpResponse.Ok
         }
 
 type private UserAuthenticator(config: ServeConfig) =
