@@ -75,7 +75,7 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
         return
             { LogLevel =
                 t
-                |> inTable<string> "loglevel"
+                |> inTable<string> "log_level"
                 |> Option.map _.ToLowerInvariant()
                 |> Option.map (fun s ->
                     match s with
@@ -92,8 +92,8 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
                 |> inTable "auth"
                 |> Option.bind (inTable<string> "htpasswd")
                 |> Option.map HtpasswdFile.Parse
-              HttpUrls = t |> inTable "http" |> Option.bind (inTable "listenurls") |> Option.map asList
-              SmtpUrls = t |> inTable "smtp" |> Option.bind (inTable "listenurls") |> Option.map asList
+              HttpUrls = t |> inTable "http" |> Option.bind (inTable "listen_urls") |> Option.map asList
+              SmtpUrls = t |> inTable "smtp" |> Option.bind (inTable "listen_urls") |> Option.map asList
               Templates = t |> inTable "templates" |> Option.map asMap |> Option.defaultValue Map.empty
               Inbox = inbox }
     }
@@ -116,7 +116,7 @@ let loadGmailConfig (t: TomlTable) =
             | None -> failwith "Missing path to Google credentials file."
 
         let credentialsStore =
-            match google |> Option.bind (inTable "tokensstore") with
+            match google |> Option.bind (inTable "tokens_store") with
             | Some path -> DirectoryInfo path
             | None -> failwith "Missing path to Google tokens directory."
 
@@ -147,7 +147,7 @@ let testGmail (t: TomlTable) =
             | None -> failwith "Missing path to Google credentials file."
 
         let credentialsStore =
-            match google |> Option.bind (inTable "tokensstore") with
+            match google |> Option.bind (inTable "tokens_store") with
             | Some path -> DirectoryInfo path
             | None -> failwith "Missing path to Google tokens directory."
 
@@ -166,7 +166,7 @@ let loadImapConfig (t: TomlTable) =
     let perms = imap |> Option.bind (inTable "permissions")
 
     let uri =
-        match imap |> Option.bind (inTable "connecturl") with
+        match imap |> Option.bind (inTable "connect_url") with
         | Some url -> Uri url
         | None -> failwith "Missing imap:// or imaps:// connection URL."
 
@@ -189,7 +189,7 @@ let testImap (t: TomlTable) =
         let imap = t |> inTable "imap"
 
         let uri =
-            match imap |> Option.bind (inTable "connecturl") with
+            match imap |> Option.bind (inTable "connect_url") with
             | Some url -> Uri url
             | None -> failwith "Missing imap:// or imaps:// connection URL."
 
