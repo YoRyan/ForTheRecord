@@ -549,9 +549,7 @@ let configureServices (config: ServeConfig) (services: IServiceCollection) =
     |> ignore
 
 let configureWebHost (config: ServeConfig) (builder: IWebHostBuilder) =
-    match config.HttpUrls with
-    | Some urls -> builder.UseUrls(List.toArray urls) |> ignore
-    | None -> ()
+    builder.UseUrls(List.toArray config.HttpUrls.Value) |> ignore
 
 let serveHttpAsync (config: ServeConfig) =
     task {

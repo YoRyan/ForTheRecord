@@ -12,6 +12,7 @@ nuget Markdig ~> 1
 nuget Meziantou.Framework.Http.Htpasswd ~> 1
 nuget Microsoft.AspNetCore.TestHost
 nuget Microsoft.NET.Test.Sdk
+nuget SmtpServer ~> 11
 nuget System.CommandLine ~> 2
 nuget Tomlyn ~> 2
 nuget xunit ~> 2

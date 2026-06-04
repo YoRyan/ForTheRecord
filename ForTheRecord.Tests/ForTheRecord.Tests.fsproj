@@ -12,6 +12,7 @@
     <Compile Include="TestApprise.fs" />
     <Compile Include="TestShoutrrr.fs" />
     <Compile Include="TestNtfy.fs" />
+    <Compile Include="TestSmtp.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ForTheRecord\ForTheRecord.fsproj" />

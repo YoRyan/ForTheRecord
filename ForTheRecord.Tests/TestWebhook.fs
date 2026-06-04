@@ -86,6 +86,7 @@ let ``JSON import handles custom template with json key`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {
@@ -133,6 +134,7 @@ let ``JSON import handles custom template with reference to user`` () =
     let config =
         { Htpasswd = config.Htpasswd
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {
@@ -178,6 +180,7 @@ let ``JSON import handles reference to gmail`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {
@@ -224,6 +227,7 @@ let ``JSON import handles reference to imap`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {

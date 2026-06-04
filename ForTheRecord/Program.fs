@@ -5,24 +5,39 @@ open Tomlyn.Model
 
 open ForTheRecord.Config
 open ForTheRecord.Http
+open ForTheRecord.Smtp
+
+let runServers (config: ServeConfig) =
+    task {
+        match config.HttpUrls, config.SmtpUrls with
+        | Some _, Some _ ->
+            return!
+                [ serveHttpAsync config; serveSmtpAsync config ]
+                |> Seq.cast<Task>
+                |> Seq.toArray
+                |> Task.WhenAll
+        | Some _, None -> return! serveHttpAsync config
+        | None, Some _ -> return! serveSmtpAsync config
+        | None, None -> failwith "No HTTP or SMTP endpoints are configured. There is nothing to do."
+    }
+
+let serveGmail (config: TomlTable) =
+    task {
+        let! serveConfig = loadServeConfig loadGmailConfig config
+        return! runServers serveConfig
+    }
+
+let serveImap (config: TomlTable) =
+    task {
+        let! serveConfig = loadServeConfig loadImapConfig config
+        return! runServers serveConfig
+    }
 
 let runWithConfig (fn: TomlTable -> Task<unit>) (file: FileInfo) : Task =
     task {
         use file = file.OpenRead()
         let config = Tomlyn.TomlSerializer.Deserialize<TomlTable> file
         do! fn config
-    }
-
-let serveGmail (config: TomlTable) =
-    task {
-        let! serveConfig = loadServeConfig loadGmailConfig config
-        return! serveHttpAsync serveConfig
-    }
-
-let serveImap (config: TomlTable) =
-    task {
-        let! serveConfig = loadServeConfig loadImapConfig config
-        return! serveHttpAsync serveConfig
     }
 
 [<EntryPoint>]

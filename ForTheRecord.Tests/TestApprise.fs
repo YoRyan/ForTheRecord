@@ -158,6 +158,7 @@ let ``Apprise import handles custom template`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {

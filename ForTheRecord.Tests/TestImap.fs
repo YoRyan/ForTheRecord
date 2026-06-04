@@ -25,6 +25,7 @@ let ``Endpoints not available when Imap is not configured`` (uri: string) =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates = Map.empty
           Inbox = Gmail(Set.empty, mock) }
 

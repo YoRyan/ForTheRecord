@@ -23,6 +23,7 @@ type ConfiguredInbox =
 type ServeConfig =
     { Htpasswd: HtpasswdFile option
       HttpUrls: string list option
+      SmtpUrls: string list option
       Templates: Map<string, string>
       Inbox: ConfiguredInbox }
 
@@ -64,6 +65,7 @@ let loadServeConfig (loadInboxConfig: TomlTable -> Task<ConfiguredInbox>) (t: To
                 |> Option.bind (inTable<string> "htpasswd")
                 |> Option.map HtpasswdFile.Parse
               HttpUrls = t |> inTable "http" |> Option.bind (inTable "urls") |> Option.map asList
+              SmtpUrls = t |> inTable "smtp" |> Option.bind (inTable "urls") |> Option.map asList
               Templates = t |> inTable "templates" |> Option.map asMap |> Option.defaultValue Map.empty
               Inbox = inbox }
     }

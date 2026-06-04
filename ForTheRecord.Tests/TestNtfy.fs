@@ -458,6 +458,7 @@ let ``Ntfy JSON import handles custom template`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {
@@ -727,6 +728,7 @@ let ``Ntfy simple import handles custom template`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {

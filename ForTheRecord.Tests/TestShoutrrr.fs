@@ -44,6 +44,7 @@ let ``Shoutrrr import handles custom template`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {
@@ -84,6 +85,7 @@ let ``Shoutrrr import handles custom template with reference to user`` () =
     let config =
         { Htpasswd = config.Htpasswd
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {
@@ -240,6 +242,7 @@ let ``Shoutrrr JSON import handles custom template`` () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates =
             Map(
                 seq {

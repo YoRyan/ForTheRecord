@@ -6,6 +6,7 @@ open System.Net.Http
 open System.Net.Http.Headers
 open System.Text
 open System.Text.Json
+open System.Threading
 open System.Threading.Tasks
 
 open Giraffe
@@ -22,6 +23,7 @@ open ForTheRecord.Gmail
 open ForTheRecord.Helpers
 open ForTheRecord.Http
 open ForTheRecord.Imap
+open ForTheRecord.Smtp
 
 type MockGmailInbox() =
     member val CalledImport: {| Message: MimeMessage
@@ -79,7 +81,7 @@ type MockImapInbox() =
 
             Task.FromResult()
 
-let getTestApp (config: ServeConfig) =
+let private getTestApp (config: ServeConfig) =
     let builder = WebApplication.CreateBuilder()
     builder.WebHost.UseTestServer() |> ignore
     configureServices config builder.Services
@@ -105,6 +107,7 @@ let mockGmailWithoutAuth () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates = Map.empty
           Inbox = Gmail(Set.empty, mock) }
 
@@ -119,6 +122,7 @@ let mockGmailWithHunter2Auth (user: string) (hasInsert: bool) =
     let config =
         { Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
           HttpUrls = None
+          SmtpUrls = None
           Templates = Map.empty
           Inbox = Gmail(authSet hasInsert, mock) }
 
@@ -130,6 +134,7 @@ let mockImapWithoutAuth () =
     let config =
         { Htpasswd = None
           HttpUrls = None
+          SmtpUrls = None
           Templates = Map.empty
           Inbox = Imap(Set.empty, mock) }
 
@@ -144,10 +149,28 @@ let mockImapWithHunter2Auth (user: string) (hasInsert: bool) =
     let config =
         { Htpasswd = Some(HtpasswdFile.Parse $"{user}:$apr1$nKTVHFsh$8gVerNz4iYOp211EbpBpJ0\n")
           HttpUrls = None
+          SmtpUrls = None
           Templates = Map.empty
           Inbox = Imap(authSet hasInsert, mock) }
 
     config, mock
+
+let testSmtpServer (config: ServeConfig) (cancel: CancellationToken) =
+    task {
+        let runServer = serveTestSmtpAsync config cancel
+        let mutable success = false
+
+        while not success do
+            let client = new Net.Smtp.SmtpClient()
+
+            try
+                do! client.ConnectAsync("localhost", testSmtpPort, cancellationToken = cancel)
+                success <- true
+            with _ ->
+                do! Task.Delay 100
+
+        return runServer
+    }
 
 let makeBasicAuth (user: string) (pass: string) =
     AuthenticationHeaderValue("Basic", $"{user}:{pass}" |> Encoding.UTF8.GetBytes |> Convert.ToBase64String)
@@ -179,3 +202,13 @@ let downloadBytes (url: string) =
     }
     |> Async.AwaitTask
     |> Async.RunSynchronously
+
+let internetAddress (addresses: string seq) =
+    Seq.map (fun (a: string) -> InternetAddress.Parse a) addresses
+
+let makeMimeEntity (mediaType: string, mediaSubtype: string) (content: string) =
+    task {
+        use stream = new MemoryStream(Encoding.UTF8.GetBytes content)
+        let contentType = ContentType(mediaType, mediaSubtype)
+        return! MimePart.LoadAsync(contentType, stream)
+    }
