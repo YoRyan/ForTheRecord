@@ -170,9 +170,41 @@ configs:
 
 ### One-Line Script Notification
 
+Generate notifications from shell scripts without any external dependencies:
+
+```sh
+curl -H 'From: me' -H 'Subject: My Notification' -H 'Content-Type: text/plain' -d 'Hello, World!' http://fortherecord.local/api/gmail/messages/import/ez
+```
+
+(At minimum, emails must include a From: header.)
+
 ### Apprise URL (Change Detection, Home Assistant, Etc.)
 
+ForTheRecord's `/apprise` endpoint is designed specifically for Apprise's generic JSON notification [service](https://appriseit.com/services/json/), including support for attachments. But care must be taken if the notification sender uses HTML or Markdown markup. (Change Detection is one application that can be configured to do so.) The behavior of the JSON plugin is [not intuitive](https://github.com/caronc/apprise/issues/1600) when dealing with these formats:
+
+* Apprise strips HTML markup from the message body unless the `format=html` switch, which enables HTML delivery for any plugin, is present.
+
+* Apprise does not communicate the original format in the JSON payload, so ForTheRecord has to assume that the body is plain text unless otherwise specified. You can specify the format yourself by setting the `ftr_input_format` field within the payload.
+
+In short, to connect an Apprise-powered application to ForTheRecord, use a URL in one of the following formats:
+
+```
+json://fortherecord.local/apprise?format=text&:ftr_input_format=text
+json://fortherecord.local/apprise?format=html&:ftr_input_format=html
+json://fortherecord.local/apprise?format=markdown&:ftr_input_format=markdown
+```
+
 ### SMTP Forwarder
+
+You can activate the SMTP server using the `smtp.listen_urls` key:
+
+```toml
+[smtp]
+# Like http.listen_urls, this is also an array.
+listen_urls = ["http://[::]:2525"]
+```
+
+You can use this server to import emails from applications that can only speak SMTP. Unlike a true SMTP server, all emails received by ForTheRecord will be delivered to your Gmail or IMAP inbox, whether they were addressed to yourself or not.
 
 ## Configuration Reference
 
