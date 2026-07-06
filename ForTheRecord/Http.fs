@@ -543,8 +543,7 @@ let configureServices (config: ServeConfig) (services: IServiceCollection) =
         .AddAuthentication(BasicAuthenticationDefaults.AuthenticationScheme)
         .AddBasic(fun options ->
             options.Realm <- Realms.configured
-            options.Events <- authEvents
-            ())
+            options.Events <- authEvents)
     |> ignore
 
     services
