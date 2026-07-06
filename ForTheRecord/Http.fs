@@ -121,13 +121,13 @@ let private readAttachment (file: IFormFile) =
 
 [<CLIMutable>]
 type GmailImportForm =
-    { LabelId: string list option
-      Body: string option
-      BodyType: string option
-      InternalDateSource: string option
-      NeverMarkSpam: bool option
-      ProcessForCalendar: bool option
-      Deleted: bool option }
+    { label_id: string list option
+      body: string option
+      body_type: string option
+      internal_date_source: string option
+      never_mark_spam: bool option
+      process_for_calendar: bool option
+      deleted: bool option }
 
 let private gmailImportHandler =
     handleContext (fun ctx ->
@@ -138,13 +138,13 @@ let private gmailImportHandler =
 
             use body =
                 new MimePart(
-                    form.BodyType
+                    form.body_type
                     |> Option.bind (parseContentType >> Result.toOption)
                     |> Option.defaultWith (fun () -> ContentType("text", "plain"))
                 )
 
             use bodyStream =
-                new MemoryStream(form.Body |> Option.defaultValue "" |> Encoding.UTF8.GetBytes)
+                new MemoryStream(form.body |> Option.defaultValue "" |> Encoding.UTF8.GetBytes)
 
             body.Content <- new MimeContent(bodyStream)
 
@@ -167,13 +167,13 @@ let private gmailImportHandler =
                 (getGmailInbox config)
                     .Import(
                         stream,
-                        ?labelIds = form.LabelId,
+                        ?labelIds = form.label_id,
                         ?internalDateSource =
-                            (form.InternalDateSource
+                            (form.internal_date_source
                              |> Option.bind (parseInternalDateSource >> Result.toOption)),
-                        ?neverMarkSpam = form.NeverMarkSpam,
-                        ?processForCalendar = form.ProcessForCalendar,
-                        ?deleted = form.Deleted
+                        ?neverMarkSpam = form.never_mark_spam,
+                        ?processForCalendar = form.process_for_calendar,
+                        ?deleted = form.deleted
                     )
 
             return Some ctx
@@ -181,11 +181,11 @@ let private gmailImportHandler =
 
 [<CLIMutable>]
 type ImapAppendForm =
-    { Folder: string list option
-      Flag: string list option
-      Keyword: string list option
-      Body: string option
-      BodyType: string option }
+    { folder: string list option
+      flag: string list option
+      keyword: string list option
+      body: string option
+      body_type: string option }
 
 let private imapAppendHandler =
     handleContext (fun ctx ->
@@ -196,13 +196,13 @@ let private imapAppendHandler =
 
             use body =
                 new MimePart(
-                    form.BodyType
+                    form.body_type
                     |> Option.bind (parseContentType >> Result.toOption)
                     |> Option.defaultWith (fun () -> ContentType("text", "plain"))
                 )
 
             use bodyStream =
-                new MemoryStream(form.Body |> Option.defaultValue "" |> Encoding.UTF8.GetBytes)
+                new MemoryStream(form.body |> Option.defaultValue "" |> Encoding.UTF8.GetBytes)
 
             body.Content <- new MimeContent(bodyStream)
 
@@ -218,16 +218,16 @@ let private imapAppendHandler =
             message.Body <- multipart
 
             let inbox = getImapInbox config
-            let flags = Option.map parseImapFlags form.Flag
+            let flags = Option.map parseImapFlags form.flag
 
-            match form.Folder with
+            match form.folder with
             | Some folders ->
                 do!
                     folders
-                    |> Seq.map (fun f -> inbox.Append(message, f, ?flags = flags, ?keywords = form.Keyword))
+                    |> Seq.map (fun f -> inbox.Append(message, f, ?flags = flags, ?keywords = form.keyword))
                     |> Seq.cast<Task>
                     |> Task.WhenAll
-            | None -> do! inbox.Append(message, ?flags = flags, ?keywords = form.Keyword)
+            | None -> do! inbox.Append(message, ?flags = flags, ?keywords = form.keyword)
 
             return Some ctx
         })

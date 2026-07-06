@@ -228,7 +228,7 @@ let ``Curl import with application/x-www-form-urlencoded works with non-plain bo
         new FormUrlEncodedContent(
             seq {
                 "body", "Hello, <em>World!</em>"
-                "bodytype", "text/html"
+                "body_type", "text/html"
             }
             |> Seq.map KeyValuePair
         )

@@ -207,11 +207,11 @@ let ``Curl import with application/x-www-form-urlencoded works`` () =
                 "body",
                 "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
 
-                "labelid", "INBOX"
-                "labelid", "STARRED"
-                "internaldatesource", "dateheader"
-                "nevermarkspam", "true"
-                "processforcalendar", "false"
+                "label_id", "INBOX"
+                "label_id", "STARRED"
+                "internal_date_source", "dateheader"
+                "never_mark_spam", "true"
+                "process_for_calendar", "false"
             }
             |> Seq.map KeyValuePair
         )
@@ -244,7 +244,7 @@ let ``Curl import with application/x-www-form-urlencoded works with non-plain bo
         new FormUrlEncodedContent(
             seq {
                 "body", "Hello, <em>World!</em>"
-                "bodytype", "text/html"
+                "body_type", "text/html"
             }
             |> Seq.map KeyValuePair
         )
@@ -269,11 +269,11 @@ let ``Curl import with multipart/form-data works`` () =
             "body",
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
 
-            "labelid", "INBOX"
-            "labelid", "STARRED"
-            "internaldatesource", "dateheader"
-            "nevermarkspam", "true"
-            "processforcalendar", "false"
+            "label_id", "INBOX"
+            "label_id", "STARRED"
+            "internal_date_source", "dateheader"
+            "never_mark_spam", "true"
+            "process_for_calendar", "false"
         } do
         content.Add(makeTextContent v, k)
 
