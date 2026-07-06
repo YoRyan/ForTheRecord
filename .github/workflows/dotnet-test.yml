@@ -1,0 +1,18 @@
+name: Run dotnet test
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: latest
+          dotnet-channel: LTS
+      - run: dotnet tool restore
+      - run: dotnet test
