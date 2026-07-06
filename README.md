@@ -83,8 +83,8 @@ services:
   fortherecord:
     image: ghcr.io/yoryan/fortherecord
     restart: unless-stopped
-    cap_add:
-      - CAP_NET_BIND_SERVICE
+    ports:
+      - 8080:8080
     configs:
       - source: fortherecord
         target: /config.toml
@@ -101,7 +101,7 @@ configs:
       tokens_store = "/google/tokensstore"
 
       [http]
-      listen_urls = ["http://[::]:80"]
+      listen_urls = ["http://[::]:8080"]
 
 volumes:
   fortherecord-tokens:
@@ -147,8 +147,8 @@ services:
   fortherecord:
     image: ghcr.io/yoryan/fortherecord
     restart: unless-stopped
-    cap_add:
-      - CAP_NET_BIND_SERVICE
+    ports:
+      - 8080:8080
     configs:
       - source: fortherecord
         target: /config.toml
@@ -163,7 +163,7 @@ configs:
       password = "hunter2"
 
       [http]
-      listen_urls = ["http://[::]:80"]
+      listen_urls = ["http://[::]:8080"]
 ```
 
 ## Use Cases
