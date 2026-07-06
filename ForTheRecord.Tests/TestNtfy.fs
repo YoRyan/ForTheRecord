@@ -96,8 +96,7 @@ let ``Ntfy JSON import sets Gmail starred and important labels for priority 5`` 
     use content =
         {| topic = "INBOX"
            message = "Whatever"
-           priority = 5
-           filename = "diskspace.jpg" |}
+           priority = 5 |}
         |> makeJsonContent
 
     request.Content <- content
@@ -120,8 +119,7 @@ let ``Ntfy JSON import sets Gmail important labels for priority 4`` () =
     use content =
         {| topic = "INBOX"
            message = "Whatever"
-           priority = 4
-           filename = "diskspace.jpg" |}
+           priority = 4 |}
         |> makeJsonContent
 
     request.Content <- content
@@ -169,8 +167,7 @@ let ``Ntfy JSON import removes Gmail INBOX label for low priority`` (priority: u
     use content =
         {| topic = "INBOX"
            message = "Whatever"
-           priority = priority
-           filename = "diskspace.jpg" |}
+           priority = priority |}
         |> makeJsonContent
 
     request.Content <- content
@@ -215,8 +212,7 @@ let ``Ntfy JSON import sets IMAP recent flag for priority 4`` () =
     use content =
         {| topic = "Inbox"
            message = "Whatever"
-           priority = 4
-           filename = "diskspace.jpg" |}
+           priority = 4 |}
         |> makeJsonContent
 
     request.Content <- content
@@ -238,8 +234,7 @@ let ``Ntfy JSON import sets no IMAP flags for priority 3`` () =
     use content =
         {| topic = "Inbox"
            message = "Whatever"
-           priority = 3
-           filename = "diskspace.jpg" |}
+           priority = 3 |}
         |> makeJsonContent
 
     request.Content <- content
@@ -263,8 +258,7 @@ let ``Ntfy JSON import sets IMAP answered flag for low priority`` (priority: uin
     use content =
         {| topic = "Inbox"
            message = "Whatever"
-           priority = priority
-           filename = "diskspace.jpg" |}
+           priority = priority |}
         |> makeJsonContent
 
     request.Content <- content
@@ -287,7 +281,6 @@ let ``Ntfy JSON import sets IMAP keywords`` () =
         {| topic = "Inbox"
            message = "Whatever"
            priority = 3
-           filename = "diskspace.jpg"
            tags = [ "warning"; "cd" ] |}
         |> makeJsonContent
 
