@@ -356,7 +356,7 @@ Careful! Google is reading this.
 
 #### Liquid Variables
 
-ForTheRecord makes the following variables available to all templates. There are some additional variables that are only present if the template is called from certain endpoints—for example, Apprise templates have access to an `attachments` variable that conveys all the attachments transmitted by Apprise.
+ForTheRecord makes the following variables available to all templates:
 
 ##### ftr.user (string/nil)
 
@@ -373,6 +373,10 @@ True if a Gmail inbox is configured.
 ##### ftr.is_imap (boolean)
 
 True if an IMAP inbox is configured.
+
+##### json (object)
+
+Maps to the top-level JSON object if this template is accepting a JSON payload. For JSON endpoints, ForTheRecord exposes the JSON fields as Liquid variables, so this variable is useful if one of the fields has a naming conflict with a built-in variable. For example, `json.ftr` can be used to access the `ftr` field, and `json.json` can be used to access the `json` field.
 
 #### Liquid Filters
 
