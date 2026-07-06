@@ -168,7 +168,7 @@ configs:
 
 ## Use Cases
 
-### One-Line Script Notification
+### One-Line Notification
 
 Generate notifications from shell scripts without any external dependencies:
 
@@ -178,7 +178,7 @@ curl -H 'From: me' -H 'Subject: My Notification' -H 'Content-Type: text/plain' -
 
 (At minimum, emails must include a From: header.)
 
-### Apprise URL (Change Detection, Home Assistant, Etc.)
+### Apprise
 
 ForTheRecord's `/apprise` endpoint is designed specifically for Apprise's generic JSON notification [service](https://appriseit.com/services/json/), including support for attachments. But care must be taken if the notification sender uses HTML or Markdown markup. (Change Detection is one application that can be configured to do so.) The behavior of the JSON plugin is [not intuitive](https://github.com/caronc/apprise/issues/1600) when dealing with these formats:
 
@@ -194,6 +194,50 @@ json://fortherecord.local/apprise?format=html&:ftr_input_format=html
 json://fortherecord.local/apprise?format=markdown&:ftr_input_format=markdown
 ```
 
+### Notify (Go library)
+
+Use the `/go/notify` endpoint with the default settings:
+
+```go
+httpService := http.New()
+httpService.AddReceiversURL("http://fortherecord.local/go/notify")
+```
+
+### Ntfy
+
+ForTheRecord emulates a self-hosted Ntfy server, allowing applications that integrate Ntfy to publish directly to your inbox. Not all of the (numerous) mainline Ntfy features are supported, but the most important ones are. The following are known *not* to work:
+
+* Updating and deleting notifications
+* Scheduled delivery
+* Phone calls
+* Android broadcast action buttons
+* Message templating (Ntfy's system; ours still works)
+* Email notifications and publishing (kind of redundant...)
+
+To use ForTheRecord with Ntfy, set the topic to one of the following:
+
+```
+fortherecord.local/ntfy/<target>
+fortherecord.local/ntfy_template/<template>/<target>
+```
+
+If a Gmail inbox is configured, `<target>` sets the Gmail label ID for the new message (if in doubt about this, use `INBOX`). If an IMAP inbox is configured, `<target>` selects the IMAP folder to place the new message into. For the template endpoint, `<template>` selects the configured template to use.
+
+If the sender publishes Ntfy notifications using JSON payloads (e.g. Jellyfin), use `fortherecord.local/ntfy` as the server.
+
+The Liquid variables made available to Ntfy templates are a perfect match for the fields in Ntfy's JSON message [format](https://docs.ntfy.sh/publish/#publish-as-json), even if the notification was submitted using one of the non-JSON endpoints.
+
+### Shoutrrr
+
+You can use the Generic [service](https://containrrr.dev/shoutrrr/dev/services/generic/) with one of two endpoints:
+
+```
+generic://fortherecord.local/shoutrrr
+generic://fortherecord.local/shoutrrr/json?template=json
+```
+
+For the non-JSON endpoint, the only available Liquid variable is `message`.
+
 ### SMTP Forwarder
 
 You can activate the SMTP server using the `smtp.listen_urls` key:
@@ -205,6 +249,70 @@ listen_urls = ["http://[::]:2525"]
 ```
 
 You can use this server to import emails from applications that can only speak SMTP. Unlike a true SMTP server, all emails received by ForTheRecord will be delivered to your Gmail or IMAP inbox, whether they were addressed to yourself or not.
+
+### HTTP API
+
+These endpoints pass through HTTP request headers directly as email headers. As always, messages must at least include a From: header to be valid email.
+
+#### /api/gmail/messages/import (POST)
+
+Accepts form data POST'ed as `application/x-www-form-urlencoded`. The message `Content-Type` is read from the `bodytype` field. Only available if a Gmail inbox is configured.
+
+| Field | Value |
+| --- | --- |
+| label_id | Destination Gmail label ID |
+| body | Message body |
+| body_type | Body MIME type; defaults to `text/plain` |
+| internal_date_source | `receivedtime` or `dateheader`; see [Gmail API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/import) |
+| never_mark_spam | See [Gmail API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/import) |
+| process_for_calendar | See Gmail API |
+| deleted | See Gmail API |
+
+#### /api/gmail/messages/import/ez (POST)
+
+The HTTP body is passed through directly as the message body. Only available if a Gmail inbox is configured.
+
+Please note that cURL sends POST data with a `Content-Type: application/x-www-form-urlencoded` header by default, so when using cURL with this endpoint, you must override this behavior by setting `-H 'Content-Type: text/plain'`.
+
+#### /api/imap/append (POST)
+
+Accepts form data POST'ed as `application/x-www-form-urlencoded`. The message `Content-Type` is read from the `bodytype` field. Only available if an IMAP inbox is configured.
+
+| Field | Value |
+| --- | --- |
+| folder | Destination IMAP folder |
+| flag | Set IMAP flag; multiple values set multiple flags |
+| keyword | Set IMAP keyword; multiple values set multiple keywords |
+| body | Message body |
+| body_type | Body MIME type; defaults to `text/plain` |
+
+#### /api/imap/append/ez (POST)
+
+The HTTP body is passed through directly as the message body. Only available if an IMAP inbox is configured.
+
+Please note that cURL sends POST data with a `Content-Type: application/x-www-form-urlencoded` header by default, so when using cURL with this endpoint, you must override this behavior by setting `-H 'Content-Type: text/plain'`.
+
+### JSON Webhook
+
+The endpoint at `/api/webhook` is designed to be as flexible as possible for webhooks. Set the `ftr_template` field to select a configured template. The built-in template accepts the following JSON fields:
+
+| Field | Type | Value |
+| --- | --- | --- |
+| to | string | To: header value; defaults to `me` |
+| from | string | From: header value; defaults to `ForTheRecord <me>` |
+| subject | string | Subject: header value |
+| message | string | Message body |
+| content_type | string | Body MIME type; defaults to `text/plain` |
+| gmail_label_ids | array of string | List of destination Gmail label ID's; defaults to `INBOX` |
+| gmail_starred | boolean | If true, applies the Gmail `STARRED` label |
+| gmail_important | boolean | If true, applies the Gmail `IMPORTANT` label |
+| gmail_internal_date_source | string | See [Gmail API](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/import) |
+| gmail_never_mark_spam | boolean | See Gmail API |
+| gmail_process_for_calendar | boolean | See Gmail API |
+| gmail_deleted | boolean | See Gmail API |
+| imap_folders | array of string | List of destination IMAP folders; defaults to the inbox folder |
+| imap_flags | array of string | List of IMAP flags to apply |
+| imap_keywords | array of string | List of IMAP keywords to apply |
 
 ## Configuration Reference
 
@@ -265,6 +373,28 @@ True if a Gmail inbox is configured.
 ##### ftr.is_imap (boolean)
 
 True if an IMAP inbox is configured.
+
+#### Liquid Filters
+
+##### ftr_encode_utf8 (string -> string)
+
+Encodes a string in a UTF-8 Base64 block (`=?UTF-8?B?...`) so that it is safe to embed in email headers.
+
+##### ftr_markdown (string -> string)
+
+Renders Markdown markup as HTML.
+
+##### ftr_gemoji (string -> string/nil)
+
+Converts an emoji shortcode to its corresponding GitHub emoji. Returns `nil` if the shortcode is not accepted by GitHub.
+
+##### ftr_single_shell_escape (string -> string)
+
+Quotes and escapes a string using single quotes for use as a command-line argument.
+
+##### ftr_download (string -> object)
+
+Download a URL, returning an object that contains the obtained Content-Type header (`content_type`) and Base64-encoded file content (`base64`).
 
 ### Troubleshooting
 
