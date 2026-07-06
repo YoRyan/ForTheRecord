@@ -296,6 +296,27 @@ let ``Ntfy JSON import sets IMAP keywords`` () =
     Assert.Contains("Whatever", body)
 
 [<Fact>]
+let ``Ntfy JSON import sets IMAP folders`` () =
+    let config, mock = mockImapWithoutAuth ()
+    let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy")
+
+    use content =
+        {| topic = "Inbox"
+           message = "Whatever"
+           priority = 3 |}
+        |> makeJsonContent
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called =
+        mock.CalledAppends |> List.choose (fun call -> call.Folder) |> Set.ofList
+
+    Assert.Equivalent(Set [ "Inbox" ], called)
+
+[<Fact>]
 let ``Ntfy JSON import passes through non-emoji tags`` () =
     let config, mock = mockGmailWithoutAuth ()
     let request = new HttpRequestMessage(HttpMethod.Post, "/ntfy")

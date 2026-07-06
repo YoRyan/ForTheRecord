@@ -32,6 +32,7 @@ X-FTR-Gmail-LabelID: {{ topic }}
 {% for tag in tags -%}
 X-FTR-Imap-Keyword: {{ tag }}
 {% endfor -%}
+X-FTR-Imap-Folder: {{ topic }}
 {% capture subject -%}
   {% unless tags == "" %}[{{ subject_tags }}] {% endunless %}{{ title }}
 {%- endcapture -%}
