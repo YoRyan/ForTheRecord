@@ -26,7 +26,7 @@ I consider ForTheRecord the spiritual successor to my [SMTP Translator](https://
 
 ## How to Obtain
 
-Official Docker images are available from Docker Hub (`docker.io/YoRyan/ForTheRecord`) and GitHub (`ghcr.io/YoRyan/ForTheRecord`).
+Official container images are available from Docker Hub (`docker.io/YoRyan/ForTheRecord`) and GitHub (`ghcr.io/YoRyan/ForTheRecord`). ForTheRecord follows a Go-like rolling-release model: New images are pushed as soon as dependency upgrades, bug fixes, and new features become available, but breaking changes will always result in a major version bump and a new Git branch and registry tag to track updates for that version. The `latest` tag always points to the newest code and makes no guarantees about backwards compatibility. As there is currently only one major version, there is only one other tag: `1`, which contains the exact same code as `latest`.
 
 To build the service yourself, install a .NET SDK, and then run `dotnet restore` in the source repository.
 
