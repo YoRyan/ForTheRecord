@@ -256,7 +256,7 @@ These endpoints pass through HTTP request headers directly as email headers. As 
 
 #### /api/gmail/messages/import (POST)
 
-Accepts form data POST'ed as `application/x-www-form-urlencoded`. The message `Content-Type` is read from the `bodytype` field. Only available if a Gmail inbox is configured.
+Accepts form data POST'ed as `application/x-www-form-urlencoded`. The message `Content-Type` is read from the `body_type` field. Only available if a Gmail inbox is configured.
 
 | Field | Value |
 | --- | --- |
@@ -276,7 +276,7 @@ Please note that cURL sends POST data with a `Content-Type: application/x-www-fo
 
 #### /api/imap/append (POST)
 
-Accepts form data POST'ed as `application/x-www-form-urlencoded`. The message `Content-Type` is read from the `bodytype` field. Only available if an IMAP inbox is configured.
+Accepts form data POST'ed as `application/x-www-form-urlencoded`. The message `Content-Type` is read from the `body_type` field. Only available if an IMAP inbox is configured.
 
 | Field | Value |
 | --- | --- |
