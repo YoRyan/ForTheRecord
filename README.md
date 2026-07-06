@@ -53,7 +53,7 @@ A minimum viable configuration is as follows:
 [google]
 credentials = "/google/client_secret.json"
 # It's a good idea to stick with this directory because it's encoded as a volume
-# in the Dockerfile definition. That means that if you mount a volume at this
+# in the Containerfile definition. That means that if you mount a volume at this
 # directory, Docker will automatically populate it with the correct permissions.
 tokens_store = "/google/tokensstore"
 
