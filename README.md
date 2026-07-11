@@ -20,6 +20,8 @@ curl -H 'From: me' -H 'Subject: Awesome Notification' -d body='Hello, World!' fo
 NTFY_TOPIC=fortherecord.local/ntfy/INBOX ntfy pub -t 'My Awesome Notification' 'Hello, World!'
 ```
 
+<img width="798" height="233" alt="image" src="https://github.com/user-attachments/assets/f842696c-e0a0-4d8a-bd46-f0066755a3a4" />
+
 Why the need for a bridge service? The official Gmail API makes generating emails a cinch, but notification libraries do not include support for it, because the HTTP and OAuth flows needed to talk successfully to Gmail are quite complicated and the libraries are not willing to take on a heavy Google SDK dependency. For email providers other than Gmail, ForTheRecord is still useful as a way to expose your IMAP inbox to your homelab in a secure, limited fashion—more secure than, for example, duplicating your SMTP credentials across every app's configuration. And in the future, if IMAP providers follow in Gmail's footsteps and begin to require two-factor authentication, it may become necessary to use ForTheRecord to negotiate the OAuth flows and continue to deliver email notifications.
 
 I consider ForTheRecord the spiritual successor to my [SMTP Translator](https://github.com/YoRyan/smtp-translator) and [Mailrise](https://github.com/YoRyan/mailrise) projects.
