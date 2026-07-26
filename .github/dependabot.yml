@@ -6,10 +6,12 @@
 
 version: 2
 updates:
- - package-ecosystem: "dotnet-sdk"
-   directory: "/"
-   schedule:
-     interval: quarterly
+# This won't work with Paket. GitHub issue:
+# https://github.com/dependabot/dependabot-core/issues/2190
+#  - package-ecosystem: "dotnet-sdk"
+#    directory: "/"
+#    schedule:
+#      interval: quarterly
  - package-ecosystem: "devcontainers"
    directory: "/"
    schedule:
