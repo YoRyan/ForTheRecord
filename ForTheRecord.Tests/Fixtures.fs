@@ -185,6 +185,8 @@ let makeTextContent = makeContent "text/plain"
 let makeJsonContent (o: obj) =
     makeContent "application/json" (System.Text.Json.JsonSerializer.Serialize o)
 
+let makeEmailContent = makeContent "message/rfc822"
+
 let readEntity (e: MimeEntity) =
     use stream = new MemoryStream()
     e.WriteTo stream

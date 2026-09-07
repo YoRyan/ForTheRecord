@@ -254,7 +254,7 @@ You can use this server to import emails from applications that can only speak S
 
 ### HTTP API
 
-These endpoints pass through HTTP request headers directly as email headers. As always, messages must at least include a From: header to be valid email.
+Most endpoints pass through HTTP request headers directly as email headers. As always, messages must at least include a From: header to be valid email.
 
 #### /api/gmail/messages/import (POST)
 
@@ -276,6 +276,10 @@ The HTTP body is passed through directly as the message body. Only available if 
 
 Please note that cURL sends POST data with a `Content-Type: application/x-www-form-urlencoded` header by default, so when using cURL with this endpoint, you must override this behavior by setting `-H 'Content-Type: text/plain'`.
 
+#### /api/gmail/messages/import/raw (POST)
+
+The HTTP body is passed through directly as an entire RFC 822 email message envelope. The HTTP request headers will be ignored. Only available if a Gmail inbox is configured.
+
 #### /api/imap/append (POST)
 
 Accepts form data POST'ed as `application/x-www-form-urlencoded`. The message `Content-Type` is read from the `body_type` field. Only available if an IMAP inbox is configured.
@@ -293,6 +297,10 @@ Accepts form data POST'ed as `application/x-www-form-urlencoded`. The message `C
 The HTTP body is passed through directly as the message body. Only available if an IMAP inbox is configured.
 
 Please note that cURL sends POST data with a `Content-Type: application/x-www-form-urlencoded` header by default, so when using cURL with this endpoint, you must override this behavior by setting `-H 'Content-Type: text/plain'`.
+
+#### /api/imap/append/raw (POST)
+
+The HTTP body is passed through directly as an entire RFC 822 email message envelope. The HTTP request headers will be ignored. Only available if an IMAP inbox is configured.
 
 ### JSON Webhook
 

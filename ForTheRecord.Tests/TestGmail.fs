@@ -17,6 +17,7 @@ open Fixtures
 
 [<Theory>]
 [<InlineData("/api/gmail/messages/import/ez")>]
+[<InlineData("/api/gmail/messages/import/raw")>]
 [<InlineData("/api/gmail/messages/import")>]
 let ``Endpoints not available when Gmail is not configured`` (uri: string) =
     let mock = MockImapInbox()
@@ -377,6 +378,39 @@ let ``Curl import passes through headers`` () =
 
     let called = mock.CalledImport.Value
     Assert.Equal("bob@example.com", string called.Message.To)
+    Assert.Equal("Hello, World!", called.Message.Subject)
+
+[<Fact>]
+let ``Raw import works`` () =
+    let config, mock = mockGmailWithoutAuth ()
+
+    let message =
+        """From: me
+To: me
+Subject: Hello, World!
+Content-Type: text/plain
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+"""
+
+    use content = makeEmailContent message
+
+    let request =
+        new HttpRequestMessage(HttpMethod.Post, "/api/gmail/messages/import/raw")
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = mock.CalledImport.Value
+
+    Assert.Equal(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        TextFormat.Text |> called.Message.GetTextBody |> _.Trim()
+    )
+
+    Assert.Equal("text/plain", called.Message.Body.ContentType.MimeType)
     Assert.Equal("Hello, World!", called.Message.Subject)
 
 [<Fact>]

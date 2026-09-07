@@ -18,6 +18,7 @@ open Fixtures
 
 [<Theory>]
 [<InlineData("/api/imap/append/ez")>]
+[<InlineData("/api/imap/append/raw")>]
 [<InlineData("/api/imap/append")>]
 let ``Endpoints not available when Imap is not configured`` (uri: string) =
     let mock = MockGmailInbox()
@@ -366,6 +367,38 @@ let ``Curl import passes through headers`` () =
 
     let called = Seq.last mock.CalledAppends
     Assert.Equal("bob@example.com", string called.Message.To)
+    Assert.Equal("Hello, World!", called.Message.Subject)
+
+[<Fact>]
+let ``Raw import works`` () =
+    let config, mock = mockImapWithoutAuth ()
+
+    let message =
+        """From: me
+To: me
+Subject: Hello, World!
+Content-Type: text/plain
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+"""
+
+    use content = makeEmailContent message
+
+    let request = new HttpRequestMessage(HttpMethod.Post, "/api/imap/append/raw")
+
+    request.Content <- content
+
+    let response = testRequest config request
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+
+    let called = Seq.last mock.CalledAppends
+
+    Assert.Equal(
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        TextFormat.Text |> called.Message.GetTextBody |> _.Trim()
+    )
+
+    Assert.Equal("text/plain", called.Message.Body.ContentType.MimeType)
     Assert.Equal("Hello, World!", called.Message.Subject)
 
 [<Fact>]

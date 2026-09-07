@@ -105,6 +105,20 @@ let private simpleImportHandler =
             return Some ctx
         })
 
+let private rawImportHandler =
+    handleContext (fun ctx ->
+        task {
+            let config = ctx.GetService<ServeConfig>()
+
+            let import =
+                match config.Inbox with
+                | Gmail(_authInsert, inbox) -> importWholeMessageToGmail inbox
+                | Imap(_authAppend, inbox) -> importWholeMessageToImap inbox
+
+            do! import ctx.Request.Body
+            return Some ctx
+        })
+
 let private readAttachment (file: IFormFile) =
     let attach =
         new MimePart(
@@ -436,6 +450,10 @@ let gmailApiRoutes =
           >=> requiresRole Roles.gmailInsert
           >=> requiresGmail
           >=> simpleImportHandler
+          route "/api/gmail/messages/import/raw"
+          >=> requiresRole Roles.gmailInsert
+          >=> requiresGmail
+          >=> rawImportHandler
           route "/api/gmail/messages/import"
           >=> requiresRole Roles.gmailInsert
           >=> requiresGmail
@@ -447,6 +465,10 @@ let imapApiRoutes =
           >=> requiresRole Roles.imapAppend
           >=> requiresImap
           >=> simpleImportHandler
+          route "/api/imap/append/raw"
+          >=> requiresRole Roles.imapAppend
+          >=> requiresImap
+          >=> rawImportHandler
           route "/api/imap/append"
           >=> requiresRole Roles.imapAppend
           >=> requiresImap
