@@ -62,7 +62,7 @@ tokens_store = "/google/tokensstore"
 
 [http]
 # This is an *array* of strings, even if you're only specifying one address!
-listen_urls = ["http://[::]:8080"]
+listen_urls = ["http://*:8080"]
 ```
 
 It specifies the paths to the Google secrets file and token storage directory and also specifies at least one listening address for the HTTP server.
@@ -104,7 +104,7 @@ configs:
       tokens_store = "/google/tokensstore"
 
       [http]
-      listen_urls = ["http://[::]:8080"]
+      listen_urls = ["http://*:8080"]
 
 volumes:
   fortherecord-tokens:
@@ -125,7 +125,7 @@ password = "hunter2"
 
 [http]
 # This is an *array* of strings, even if you're only specifying one address!
-listen_urls = ["http://[::]:8080"]
+listen_urls = ["http://*:8080"]
 
 ```
 
@@ -166,7 +166,7 @@ configs:
       password = "hunter2"
 
       [http]
-      listen_urls = ["http://[::]:8080"]
+      listen_urls = ["http://*:8080"]
 ```
 
 ## Use Cases
@@ -248,7 +248,7 @@ You can activate the SMTP server using the `smtp.listen_urls` key:
 ```toml
 [smtp]
 # Like http.listen_urls, this is also an array.
-listen_urls = ["http://[::]:2525"]
+listen_urls = ["smtp://*:2525"]
 ```
 
 You can use this server to import emails from applications that can only speak SMTP. Unlike a true SMTP server, all emails received by ForTheRecord will be delivered to your Gmail or IMAP inbox, whether they were addressed to yourself or not.
@@ -433,13 +433,13 @@ A map of user-defined names to strings containing templates. See [#Custom Templa
 
 #### http.listen_urls (array of string)
 
-Addresses for the HTTP server to listen on, in the format of `http://<ip adddress>:<port>`.
+Addresses for the HTTP server to listen on. Refer to Kestrel's URL format [documentation](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/endpoints#url-formats). The default protocol port, if omitted, is 80.
 
 There is no default, and you must set `http.listen_urls` and/or `smtp.listen_urls`.
 
 #### smtp.listen_urls (array of string)
 
-Addresses for the SMTP server to listen on, in the format of `smtp://<ip address>:<port>`.
+Addresses for the SMTP server to listen on. The format is almost the same as [that](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/endpoints#url-formats) used by Kestrel, except that the semicolon delimiter is not supported (use multiple string items instead). The default protocol port, if omitted, is 25.
 
 There is no default, and you must set `smtp.listen_urls` and/or `http.listen_urls`.
 

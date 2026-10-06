@@ -80,18 +80,25 @@ let serveSmtpAsync (config: ServeConfig) =
 
         for url in config.SmtpUrls.Value do
             let uri = Uri url
+            let port = if uri.IsDefaultPort then 25 else uri.Port
 
-            let endpoint =
+            let ips =
                 match uri.HostNameType with
                 | UriHostNameType.IPv4
                 | UriHostNameType.IPv6 ->
+                    [IPAddress.Parse uri.Host]
+                | _ ->
+                    match uri.Host with
+                    | "localhost" -> [IPAddress.Loopback; IPAddress.IPv6Loopback]
+                    | _ -> [IPAddress.Any; IPAddress.IPv6Any]
+
+            for ip in ips do
+                let def =
                     EndpointDefinitionBuilder()
-                        .Endpoint(IPEndPoint(IPAddress.Parse uri.Host, if uri.IsDefaultPort then 2525 else uri.Port))
+                        .Endpoint(IPEndPoint(ip, port))
                         .AllowUnsecureAuthentication(true)
                         .Build()
-                | _ -> failwithf "Invalid SMTP listening address (must use an IP address for the host): %s" url
-
-            builder.Endpoint endpoint |> ignore
+                builder.Endpoint def |> ignore
 
         let provider = ComponentModel.ServiceProvider()
         provider.Add(MessageStore(config, logger))
