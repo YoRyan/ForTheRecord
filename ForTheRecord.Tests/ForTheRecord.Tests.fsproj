@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Fixtures.fs" />
+    <Compile Include="TestConfig.fs" />
     <Compile Include="TestGmail.fs" />
     <Compile Include="TestImap.fs" />
     <Compile Include="TestWebhook.fs" />

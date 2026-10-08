@@ -8,6 +8,7 @@ open Microsoft.Extensions.Logging
 open SmtpServer
 
 open ForTheRecord.Config
+open ForTheRecord.Helpers
 
 [<Literal>]
 let testSmtpPort = 12525
@@ -71,6 +72,47 @@ type private UserAuthenticator(config: ServeConfig, logger: ILogger) =
 
     interface Authentication.IUserAuthenticator
 
+let smtpUrlEndpoints (url: string) =
+    try
+        let uri: Uri = Uri url
+        let port = if uri.IsDefaultPort then 25 else uri.Port
+
+        match uri.HostNameType with
+        | UriHostNameType.IPv4
+        | UriHostNameType.IPv6 ->
+            [IPAddress.Parse uri.Host]
+        | _ ->
+            match uri.Host with
+            | "localhost" -> [IPAddress.Loopback; IPAddress.IPv6Loopback]
+            | _ -> [IPAddress.Any; IPAddress.IPv6Any]
+        |> List.map (fun ip -> IPEndPoint(ip, port))
+        |> Ok
+    with _ ->
+        let groups =
+            System.Text.RegularExpressions.Regex.Match(url, @"^smtp://(?<host>[^/:]+)(?::(?<port>[0-9]+))?/?$")
+            |> _.Groups
+
+        let host =
+            groups.TryGetValue "host"
+            |> tryGetByref
+            |> Option.map _.Value
+
+        match host with
+        | Some _ ->
+            let port =
+                groups.TryGetValue "port"
+                |> tryGetByref
+                |> Option.map _.Value
+                |> Option.filter (not << String.IsNullOrEmpty)
+                |> Option.map int
+                |> Option.defaultValue 25
+
+            // If it's not an IP address or localhost, it's a wildcard according
+            // to Kestrel rules.
+            Ok [IPEndPoint(IPAddress.Any, port); IPEndPoint(IPAddress.IPv6Any, port)]
+        | None ->
+            Error $"invalid format for listen_urls item: {url}"
+
 let serveSmtpAsync (config: ServeConfig) =
     task {
         use loggerFactory = LoggerFactory.Create(configureLogging config)
@@ -79,26 +121,17 @@ let serveSmtpAsync (config: ServeConfig) =
         let builder = SmtpServerOptionsBuilder().ServerName "ForTheRecord"
 
         for url in config.SmtpUrls.Value do
-            let uri = Uri url
-            let port = if uri.IsDefaultPort then 25 else uri.Port
-
-            let ips =
-                match uri.HostNameType with
-                | UriHostNameType.IPv4
-                | UriHostNameType.IPv6 ->
-                    [IPAddress.Parse uri.Host]
-                | _ ->
-                    match uri.Host with
-                    | "localhost" -> [IPAddress.Loopback; IPAddress.IPv6Loopback]
-                    | _ -> [IPAddress.Any; IPAddress.IPv6Any]
-
-            for ip in ips do
-                let def =
-                    EndpointDefinitionBuilder()
-                        .Endpoint(IPEndPoint(ip, port))
-                        .AllowUnsecureAuthentication(true)
-                        .Build()
-                builder.Endpoint def |> ignore
+            match smtpUrlEndpoints url with
+            | Ok eps ->
+                for ep in eps do
+                    let def =
+                        EndpointDefinitionBuilder()
+                            .Endpoint(ep)
+                            .AllowUnsecureAuthentication(true)
+                            .Build()
+                    builder.Endpoint def |> ignore
+            | Error ex ->
+                logger.LogError("Error parsing smtp.listen_urls: {}: {}", url, ex)
 
         let provider = ComponentModel.ServiceProvider()
         provider.Add(MessageStore(config, logger))
